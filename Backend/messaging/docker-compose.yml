@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # ========================================================
+  # Microservice Messaging (Go + Gin + WebSocket)
+  # ========================================================
+  messaging-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parentconnect-messaging
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - APP_ENV=development
+      - MONGO_URL=mongodb://messaging-mongo:27017
+      - MONGO_DB=messaging_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - JWT_ALGORITHM=HS256
+      - JWT_SECRET=change-me-in-production-parentconnect-secret
+      - INTERNAL_API_KEY=internal-secret-key-parentconnect
+      - MAX_MESSAGE_LENGTH=2000
+    depends_on:
+      messaging-mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - parentconnect-net
+    restart: unless-stopped
+
+  # ========================================================
+  # Base de données MongoDB dédiée (Database per service)
+  # ========================================================
+  messaging-mongo:
+    image: mongo:7.0
+    container_name: parentconnect-messaging-mongo
+    ports:
+      - "27018:27017" # Mappé sur 27018 pour éviter les collisions si d'autres Mongo tournent
+    volumes:
+      - messaging_mongo_data:/data/db
+    networks:
+      - parentconnect-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ========================================================
+  # Redis (Cache de présence, compteurs non-lus, Pub/Sub WS)
+  # ========================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: parentconnect-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - messaging_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - parentconnect-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ========================================================
+  # RabbitMQ (Bus d'événements asynchrone pour la plateforme)
+  # ========================================================
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: parentconnect-rabbitmq
+    ports:
+      - "5672:5672"   # Protocole AMQP
+      - "15672:15672" # Dashboard Web d'administration
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - messaging_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - parentconnect-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+networks:
+  parentconnect-net:
+    driver: bridge
+    name: parentconnect-net
+
+volumes:
+  messaging_mongo_data:
+    name: messaging_mongo_data
+  messaging_redis_data:
+    name: messaging_redis_data
+  messaging_rabbitmq_data:
+    name: messaging_rabbitmq_data
