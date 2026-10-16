@@ -1,0 +1,135 @@
+### ==============================================================================
+### ParentConnect - Geo & Neighborhood Service Demo Requests
+### Compatible with VS Code REST Client, IntelliJ HTTP Client & Postman
+### ==============================================================================
+
+@baseUrl = http://localhost:8000
+@internalKey = parentconnect-internal-geo-secret-key-32ch
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbl90dW5pcyIsInJvbGUiOiJBRE1JTiIsImV4cCI6MTgyMzYyMDgzMX0.roSYqn8Y687WqOG1WOUflTaoJh5jo4YnwN3yr-6zdxs
+@user1Token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwYXJlbnRfc2FyYWgiLCJyb2xlIjoiVVNFUiIsImV4cCI6MTgyMzYyMDgzMX0.ke8vm7ntj0fSG1Tud8ZvH5tx0J1PALxY-KHyUZFiN1U
+@user2Token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwYXJlbnRfa2FyaW0iLCJyb2xlIjoiVVNFUiIsImV4cCI6MTgyMzYyMDgzMX0.SK2rurwgALqposBFB3ofouPizDdhsuaWzgne4JID5Xs
+
+### 1. Healthcheck (Liveness)
+GET {{baseUrl}}/health
+Accept: application/json
+
+### 2. Readiness Check (MongoDB & RabbitMQ status)
+GET {{baseUrl}}/ready
+Accept: application/json
+
+### 3. Prometheus Metrics
+GET {{baseUrl}}/metrics
+
+### 4. [ADMIN] Création d'un Quartier (Lafayette - Tunis)
+# @name createNeighborhood
+POST {{baseUrl}}/api/geo/neighborhoods
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Lafayette Demo",
+  "city": "Tunis",
+  "center": {
+    "type": "Point",
+    "coordinates": [10.1815, 36.8065]
+  },
+  "boundary": {
+    "type": "Polygon",
+    "coordinates": [[
+      [10.1750, 36.8020],
+      [10.1880, 36.8020],
+      [10.1880, 36.8120],
+      [10.1750, 36.8120],
+      [10.1750, 36.8020]
+    ]]
+  }
+}
+
+### 5. Détail d'un Quartier par son ID
+@neighborhoodId = {{createNeighborhood.response.body.id}}
+GET {{baseUrl}}/api/geo/neighborhoods/{{neighborhoodId}}
+Authorization: Bearer {{user1Token}}
+
+### 6. Trouver un Quartier par des Coordonnées ($geoIntersects)
+GET {{baseUrl}}/api/geo/neighborhoods/by-point?lng=10.1815&lat=36.8065
+Authorization: Bearer {{user1Token}}
+
+### 7. [PARENT 1] Enregistrement de sa Position (Floutage Serveur ~200m)
+# Le point exact n'est jamais stocké. Floutage stable par HMAC (anti-moyennage).
+POST {{baseUrl}}/api/geo/locations
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "lng": 10.1815,
+  "lat": 36.8065
+}
+
+### 8. [PARENT 2] Enregistrement de sa Position proche de Parent 1
+POST {{baseUrl}}/api/geo/locations
+Authorization: Bearer {{user2Token}}
+Content-Type: application/json
+
+{
+  "lng": 10.1830,
+  "lat": 36.8075
+}
+
+### 9. [PARENT 1] Consulter sa Position Floutée
+GET {{baseUrl}}/api/geo/locations/me
+Authorization: Bearer {{user1Token}}
+
+### 10. [PUBLIC] Recherche des Parents Proches (/nearby avec $geoNear)
+# Exclut l'appelant (parent_sarah)
+# Anonymisation complète (ni nom, ni coordonnées exactes)
+# Distance arrondie à 100m près (anti-triangulation)
+GET {{baseUrl}}/api/geo/nearby?lng=10.1815&lat=36.8065&radius=2500
+Authorization: Bearer {{user1Token}}
+
+### 11. Proximité Directe entre Deux Parents (Haversine)
+GET {{baseUrl}}/api/geo/users/parent_karim/proximity
+Authorization: Bearer {{user1Token}}
+
+### 12. [INTERNAL] Recherche Inter-services (/internal/geo/users-within)
+# Utilisé par Marketplace, Babysitting, Events
+# X-Internal-Key obligatoire (temps constant)
+# Distances EXACTES conservées (non arrondies)
+GET {{baseUrl}}/internal/geo/users-within?lng=10.1815&lat=36.8065&radius=3000
+X-Internal-Key: {{internalKey}}
+
+### 13. [INTERNAL] Distance Exacte entre Deux Parents
+GET {{baseUrl}}/internal/geo/distance?userA=parent_sarah&userB=parent_karim
+X-Internal-Key: {{internalKey}}
+
+### 14. [VERIFICATION] Sarah demande une vérification d'adresse par voisin
+# @name requestVerification
+POST {{baseUrl}}/api/geo/addresses/verify
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "method": "neighbor_validation"
+}
+
+### 15. [VERIFICATION] Karim (voisin) valide l'adresse de Sarah
+@verificationId = {{requestVerification.response.body.id}}
+POST {{baseUrl}}/api/geo/addresses/{{verificationId}}/validate
+Authorization: Bearer {{user2Token}}
+
+### 16. [CIRCLES] Sarah crée son Cercle de Confiance "close"
+POST {{baseUrl}}/api/geo/circles
+Authorization: Bearer {{user1Token}}
+Content-Type: application/json
+
+{
+  "level": "close",
+  "members": ["parent_karim"]
+}
+
+### 17. [CIRCLES] Sarah consulte ses Cercles
+GET {{baseUrl}}/api/geo/circles
+Authorization: Bearer {{user1Token}}
+
+### 18. Points de Rencontre Sûrs d'un Quartier
+GET {{baseUrl}}/api/geo/meeting-points?neighborhoodId={{neighborhoodId}}
+Authorization: Bearer {{user1Token}}

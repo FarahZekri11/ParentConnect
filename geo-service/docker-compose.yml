@@ -1,0 +1,78 @@
+version: "3.8"
+
+services:
+  geo-mongo:
+    image: mongo:7
+    container_name: parentconnect-geo-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: geo_db
+    volumes:
+      - geo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - parentconnect-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: parentconnect-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    networks:
+      - parentconnect-net
+
+  geo-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parentconnect-geo-service
+    restart: unless-stopped
+    ports:
+      - "8006:8000"
+    environment:
+      - MONGO_URL=mongodb://geo-mongo:27017
+      - MONGO_DB=geo_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - INTERNAL_API_KEY=parentconnect-internal-geo-secret-key-32ch
+      - JWT_ALGORITHM=RS256
+      - JWT_SECRET=demo-secret-parentconnect-geo-2026-minimum-32-chars
+      - MAX_SEARCH_RADIUS_M=10000
+      - LOCATION_BLUR_M=200
+      - BLUR_SALT=parentconnect-geo-blur-salt-secret
+      - ADDRESS_VERIFICATION_THRESHOLD=2
+    depends_on:
+      geo-mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - parentconnect-net
+
+volumes:
+  geo_data:
+    driver: local
+
+networks:
+  parentconnect-net:
+    driver: bridge
