@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+  # ── Babysitting microservice ─────────────────────────────────────────────────
+  babysitting:
+    build:
+      context: .
+      target: production
+    container_name: babysitting-service
+    ports:
+      - "${SERVICE_PORT:-8002}:8002"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://babysitting:babysitting_pass@postgres:5432/babysitting_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - babysitting-net
+    volumes:
+      # Hot-reload mount for development (comment out for production)
+      - .:/app
+    command: >
+      sh -c "
+        echo 'Running Alembic migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting service...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+      "
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: babysitting-postgres
+    environment:
+      POSTGRES_USER: babysitting
+      POSTGRES_PASSWORD: babysitting_pass
+      POSTGRES_DB: babysitting_db
+    ports:
+      - "5433:5432"   # Expose on 5433 to avoid conflicts with other services
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U babysitting -d babysitting_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - babysitting-net
+
+  # ── Redis 7 ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: babysitting-redis
+    ports:
+      - "6380:6379"   # Expose on 6380 to avoid conflicts
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - babysitting-net
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  babysitting-net:
+    driver: bridge
