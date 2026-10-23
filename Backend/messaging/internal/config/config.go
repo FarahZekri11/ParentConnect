@@ -21,6 +21,10 @@ type Config struct {
 	JWTSecret        string // Clé secrète partagée si HS256
 	InternalAPIKey   string
 	MaxMessageLength int
+	EurekaEnabled    bool
+	EurekaServerURL  string
+	ServiceName      string
+	InstanceHost     string
 }
 
 // Load charge la configuration depuis le fichier .env (si présent) et l'environnement système.
@@ -47,6 +51,10 @@ func Load() *Config {
 		JWTSecret:        getEnv("JWT_SECRET", "change-me-in-production-parentconnect-secret"),
 		InternalAPIKey:   getEnv("INTERNAL_API_KEY", "internal-secret-key-parentconnect"),
 		MaxMessageLength: maxMsgLen,
+		EurekaEnabled:    getEnv("EUREKA_ENABLED", "true") == "true",
+		EurekaServerURL:  getEnv("EUREKA_SERVER_URL", "http://localhost:8761/eureka"),
+		ServiceName:      getEnv("SERVICE_NAME", "MESSAGING-SERVICE"),
+		InstanceHost:     getEnv("INSTANCE_HOST", "localhost"),
 	}
 }
 

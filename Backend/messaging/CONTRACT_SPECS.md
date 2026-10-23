@@ -38,6 +38,13 @@ location /ws {
 }
 ```
 
+### C. Découverte Eureka & Spring Cloud Gateway
+Pour les architectures Spring Cloud, le microservice s'enregistre automatiquement sous l'identifiant `MESSAGING-SERVICE` auprès d'Eureka Discovery (`http://localhost:8761/eureka`).
+Spring Cloud Gateway achemine dynamiquement les requêtes via `lb://MESSAGING-SERVICE` (voir configuration complète dans [`gateway/application-eureka-gateway.yml`](./gateway/application-eureka-gateway.yml)).
+- **Dashboard Eureka** : `http://localhost:8761` -> `MESSAGING-SERVICE` (Status: UP)
+- **Swagger via Gateway** : `http://localhost:8080/swagger/index.html`
+- **Swagger direct** : `http://localhost:8085/swagger/index.html`
+
 ---
 
 ## 2. 🔐 Contrat avec l'équipe Identity & Family (Java / Spring Boot)

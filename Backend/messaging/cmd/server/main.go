@@ -18,6 +18,7 @@ import (
 	_ "github.com/parentconnect/messaging-service/docs"
 	"github.com/parentconnect/messaging-service/internal/config"
 	"github.com/parentconnect/messaging-service/internal/database"
+	"github.com/parentconnect/messaging-service/internal/discovery"
 	"github.com/parentconnect/messaging-service/internal/events"
 	"github.com/parentconnect/messaging-service/internal/handlers"
 	"github.com/parentconnect/messaging-service/internal/middleware"
@@ -139,6 +140,12 @@ func main() {
 				})
 			}
 		}()
+	}
+
+	// 5.bis Enregistrement et découverte auprès de Spring Cloud Eureka Discovery
+	if cfg.EurekaEnabled {
+		eurekaClient := discovery.NewEurekaClient(cfg.EurekaServerURL, cfg.ServiceName, cfg.InstanceHost, cfg.Port, zapLogger)
+		go eurekaClient.StartLifeCycle(serverCtx)
 	}
 
 	// 6. Initialisation du routeur Gin avec middlewares de sécurité et résilience
