@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html"
 	"strings"
-	"time"
 
 	"github.com/parentconnect/messaging-service/internal/models"
 	"github.com/parentconnect/messaging-service/internal/repository"
