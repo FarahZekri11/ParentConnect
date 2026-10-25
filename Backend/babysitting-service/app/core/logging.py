@@ -45,8 +45,9 @@ def configure_logging() -> None:
         # Machine-readable JSON for log aggregators (Loki, CloudWatch, etc.)
         renderer: Any = structlog.processors.JSONRenderer()
     else:
-        # Human-readable coloured output for local development
-        renderer = structlog.dev.ConsoleRenderer(colors=True)
+        # Human-readable output for local development (disable ANSI colors on Windows without colorama)
+        import sys
+        renderer = structlog.dev.ConsoleRenderer(colors=(sys.platform != "win32"))
 
     structlog.configure(
         processors=shared_processors

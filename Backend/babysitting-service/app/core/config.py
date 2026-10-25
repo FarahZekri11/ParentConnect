@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyUrl, field_validator, model_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -54,6 +54,20 @@ class Settings(BaseSettings):
     SERVICE_PORT: int = 8002
     SERVICE_NAME: str = "babysitting-service"
     SERVICE_VERSION: str = "0.1.0"
+
+    # ── Eureka Service Discovery ───────────────────────────────────────────────
+    # URL du serveur Eureka (local sans Docker : http://localhost:8761/eureka/)
+    EUREKA_SERVER_URL: str = "http://localhost:8761/eureka/"
+    # Nom sous lequel le service s'enregistre dans Eureka (majuscules Eureka)
+    EUREKA_APP_NAME: str = "PARENTCONNECT-BABYSITTING"
+    # Adresse réseau annoncée aux autres services (localhost en mode local)
+    EUREKA_INSTANCE_HOST: str = "localhost"
+    # Intervalle entre chaque heartbeat (secondes)
+    EUREKA_HEARTBEAT_INTERVAL: int = 30
+    # Durée du bail Eureka (secondes) - doit être > heartbeat
+    EUREKA_LEASE_DURATION: int = 90
+    # Activer/désactiver l'enregistrement Eureka
+    EUREKA_ENABLED: bool = True
 
     # ── Derived helpers ───────────────────────────────────────────────────────
     @field_validator("DATABASE_URL")

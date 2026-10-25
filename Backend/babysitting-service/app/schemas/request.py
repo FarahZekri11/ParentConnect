@@ -6,7 +6,7 @@ Pydantic v2 schemas for BabysittingRequest.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time
+from datetime import date as dt_date, datetime, time
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -15,7 +15,7 @@ from app.models.request import RequestStatusEnum
 
 
 class BabysittingRequestCreate(BaseModel):
-    date: date = Field(
+    date: dt_date = Field(
         ...,
         description="Date when childcare is needed (must be today or future)",
         examples=["2026-11-15"],
@@ -55,7 +55,7 @@ class BabysittingRequestCreate(BaseModel):
 
 class BabysittingRequestUpdate(BaseModel):
     """Partial update – all fields optional."""
-    date: date | None = None
+    date: dt_date | None = None
     start_time: time | None = None
     end_time: time | None = None
     neighborhood: str | None = Field(None, min_length=2, max_length=120)
@@ -70,7 +70,7 @@ class BabysittingRequestRead(BaseModel):
 
     id: uuid.UUID
     requester_id: uuid.UUID
-    date: date
+    date: dt_date
     start_time: time
     end_time: time
     neighborhood: str

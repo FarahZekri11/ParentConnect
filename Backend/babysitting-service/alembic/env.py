@@ -16,8 +16,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 # Load app config
 from app.core.config import get_settings
 
-# Import Base so Alembic sees all models
-from app.db.base import Base  # noqa: F401 – registers all models via import side-effects
+# Import Base and models so Alembic sees all models
+from app.db.base import Base
+import app.models  # noqa: F401 – registers all models via import side-effects
 
 settings = get_settings()
 

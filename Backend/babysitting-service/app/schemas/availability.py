@@ -6,7 +6,7 @@ Pydantic v2 schemas for Availability slots.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time
+from datetime import date as dt_date, datetime, time
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -24,7 +24,7 @@ class AvailabilityCreate(BaseModel):
         description="Day of week (0=Monday..6=Sunday). Required when is_recurring=True",
         examples=[1],
     )
-    date: date | None = Field(
+    date: dt_date | None = Field(
         None,
         description="Specific date. Required when is_recurring=False",
         examples=["2026-11-15"],
@@ -71,7 +71,7 @@ class AvailabilityRead(BaseModel):
     user_id: uuid.UUID
     is_recurring: bool
     day_of_week: int | None
-    date: date | None
+    date: dt_date | None
     start_time: time
     end_time: time
     neighborhood: str

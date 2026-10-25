@@ -39,10 +39,4 @@ class TimestampMixin:
     )
 
 
-# ── Import ALL models so Alembic autogenerate can see them ────────────────────
-# The imports below look unused but are intentional – they register the mapper.
-from app.models.request import BabysittingRequest          # noqa: F401, E402
-from app.models.availability import Availability           # noqa: F401, E402
-from app.models.booking import Booking                     # noqa: F401, E402
-from app.models.credit import CreditTransaction, CreditBalance  # noqa: F401, E402
-from app.models.rating import Rating                       # noqa: F401, E402
+

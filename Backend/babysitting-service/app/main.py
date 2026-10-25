@@ -24,6 +24,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.cache.redis_client import RedisClient, set_redis_client
+from app.clients.eureka_client import get_eureka_client
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import RequestLoggingMiddleware, configure_logging, get_logger
@@ -46,10 +47,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("redis_connected", url=settings.REDIS_URL)
     set_redis_client(redis)
 
+    # ── Eureka registration (optionnel, ne bloque pas le démarrage) ─────────
+    eureka = get_eureka_client()
+    if settings.EUREKA_ENABLED:
+        registered = await eureka.register()
+        if registered:
+            await eureka.start_heartbeat_loop()
+    else:
+        logger.info("eureka_disabled", reason="EUREKA_ENABLED=false")
+
     logger.info("service_started", service=settings.SERVICE_NAME, version=settings.SERVICE_VERSION)
     yield
 
     # Cleanup
+    if settings.EUREKA_ENABLED:
+        await eureka.stop_heartbeat()
+        await eureka.deregister()
     await redis.close()
     logger.info("service_shutdown")
 
