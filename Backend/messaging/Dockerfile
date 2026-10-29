@@ -8,9 +8,13 @@ WORKDIR /app
 # Installation des dépendances système nécessaires au build
 RUN apk add --no-cache git ca-certificates tzdata
 
-# Cache des dépendances Go
-COPY go.mod go.sum* ./
-RUN go mod download || true
+# Variables d'env pour le module proxy et désactivation de la vérification checksum
+ENV GONOSUMDB=*
+ENV GOFLAGS=-mod=mod
+
+# Cache des dépendances Go (go.sum est requis)
+COPY go.mod go.sum ./
+RUN go mod download
 
 # Copie du code source complet
 COPY . .
@@ -47,7 +51,7 @@ USER appuser
 EXPOSE 8085
 
 # Sonde de vie au niveau conteneur Docker
-HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8085/health || exit 1
 
 ENTRYPOINT ["/app/messaging-service"]

@@ -2,6 +2,26 @@ version: '3.8'
 
 services:
   # ========================================================
+  # Eureka Server (Spring Cloud Service Discovery)
+  # ========================================================
+  eureka-server:
+    image: steeltoeoss/eureka-server:latest
+    container_name: parentconnect-eureka
+    ports:
+      - "8761:8761"
+    environment:
+      - EUREKA_SERVER_ENABLE_SELF_PRESERVATION=false
+    networks:
+      - parentconnect-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8761/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # ========================================================
   # Microservice Messaging (Go + Gin + WebSocket)
   # ========================================================
   messaging-service:
@@ -22,12 +42,18 @@ services:
       - JWT_SECRET=change-me-in-production-parentconnect-secret
       - INTERNAL_API_KEY=internal-secret-key-parentconnect
       - MAX_MESSAGE_LENGTH=2000
+      - EUREKA_ENABLED=true
+      - EUREKA_SERVER_URL=http://eureka-server:8761/eureka
+      - SERVICE_NAME=MESSAGING-SERVICE
+      - INSTANCE_HOST=messaging-service
     depends_on:
       messaging-mongo:
         condition: service_healthy
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     networks:
       - parentconnect-net
