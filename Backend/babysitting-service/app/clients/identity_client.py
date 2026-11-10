@@ -45,11 +45,15 @@ class UserProfile:
 
 
 class IdentityClientProtocol(Protocol):
-    async def get_user(self, user_id: UUID) -> UserProfile | None:
-        """Return user profile or None if not found."""
+    async def get_user(
+        self, user_id: UUID, token: str | None = None
+    ) -> UserProfile | None:
+        """Return user profile or None if not found. Propagates Bearer token if provided."""
         ...
 
-    async def get_users_batch(self, user_ids: list[UUID]) -> dict[UUID, UserProfile]:
+    async def get_users_batch(
+        self, user_ids: list[UUID], token: str | None = None
+    ) -> dict[UUID, UserProfile]:
         """Return a mapping of user_id → UserProfile for all found users."""
         ...
 
@@ -58,6 +62,7 @@ class HttpIdentityClient:
     """
     Calls the real Identity service over HTTP.
     Implements exponential-backoff retry (max 3 attempts) on transient errors.
+    Propagates incoming Bearer token for end-to-end security.
     """
 
     def __init__(self) -> None:
@@ -68,11 +73,17 @@ class HttpIdentityClient:
             headers={"Accept": "application/json"},
         )
 
-    async def get_user(self, user_id: UUID) -> UserProfile | None:
+    async def get_user(
+        self, user_id: UUID, token: str | None = None
+    ) -> UserProfile | None:
         url = f"/api/users/{user_id}"
+        headers: dict[str, str] = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
         for attempt in range(_RETRY_ATTEMPTS):
             try:
-                resp = await self._client.get(url)
+                resp = await self._client.get(url, headers=headers if headers else None)
                 if resp.status_code == 404:
                     return None
                 resp.raise_for_status()
@@ -103,10 +114,12 @@ class HttpIdentityClient:
                 await asyncio.sleep(delay)
         return None  # unreachable but satisfies type checker
 
-    async def get_users_batch(self, user_ids: list[UUID]) -> dict[UUID, UserProfile]:
+    async def get_users_batch(
+        self, user_ids: list[UUID], token: str | None = None
+    ) -> dict[UUID, UserProfile]:
         results: dict[UUID, UserProfile] = {}
         # Fetch concurrently – the Identity service should handle fan-out
-        tasks = [self.get_user(uid) for uid in user_ids]
+        tasks = [self.get_user(uid, token=token) for uid in user_ids]
         profiles = await asyncio.gather(*tasks, return_exceptions=False)
         for uid, profile in zip(user_ids, profiles):
             if profile is not None:
@@ -143,11 +156,15 @@ class MockIdentityClient:
             is_verified=(uid_int % 3 != 0),  # ~66 % are verified
         )
 
-    async def get_user(self, user_id: UUID) -> UserProfile | None:
+    async def get_user(
+        self, user_id: UUID, token: str | None = None
+    ) -> UserProfile | None:
         logger.debug("mock_identity_get_user", user_id=str(user_id))
         return self._make_profile(user_id)
 
-    async def get_users_batch(self, user_ids: list[UUID]) -> dict[UUID, UserProfile]:
+    async def get_users_batch(
+        self, user_ids: list[UUID], token: str | None = None
+    ) -> dict[UUID, UserProfile]:
         return {uid: self._make_profile(uid) for uid in user_ids}
 
 

@@ -1,0 +1,92 @@
+version: "3.9"
+
+# ==============================================================================
+# Standalone Local Test Composition – Babysitting Service + Dedicated DB + Redis
+# Runs on an isolated bridge network without external infrastructure dependencies.
+# ==============================================================================
+
+services:
+  babysitting-service:
+    build:
+      context: .
+      target: production
+    container_name: babysitting-service-local
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - APP_PORT=8080
+      - SERVICE_PORT=8080
+      - SERVICE_NAME=babysitting-service
+      - SERVICE_VERSION=0.1.0
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+
+      # Local dedicated PostgreSQL & Redis
+      - DATABASE_URL=postgresql+asyncpg://babysitting:babysitting_pass@babysitting-local-db:5432/babysitting_db
+      - REDIS_URL=redis://babysitting-local-redis:6379/0
+
+      # Standalone mode: Eureka and RabbitMQ disabled for local unit/manual tests
+      - EUREKA_ENABLED=false
+      - RABBITMQ_ENABLED=false
+      - USE_MOCK_IDENTITY=true
+
+      # Local test JWT secret (allows test token generation via POST /dev/token)
+      - JWT_SECRET=dev-secret-key-for-local-testing-only-1234567890
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      babysitting-local-db:
+        condition: service_healthy
+      babysitting-local-redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Applying database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting Babysitting Service on port 8080...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8080
+      "
+    restart: unless-stopped
+    networks:
+      - babysitting-local-net
+
+  babysitting-local-db:
+    image: postgres:16-alpine
+    container_name: babysitting-local-db
+    environment:
+      POSTGRES_USER: babysitting
+      POSTGRES_PASSWORD: babysitting_pass
+      POSTGRES_DB: babysitting_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - babysitting_local_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U babysitting -d babysitting_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - babysitting-local-net
+
+  babysitting-local-redis:
+    image: redis:7-alpine
+    container_name: babysitting-local-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - babysitting-local-net
+
+volumes:
+  babysitting_local_pgdata:
+
+networks:
+  babysitting-local-net:
+    driver: bridge

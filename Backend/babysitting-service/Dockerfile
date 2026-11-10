@@ -22,15 +22,12 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 RUN chown -R appuser:appgroup /app
 USER appuser
 
-EXPOSE 8002
+ENV PORT=8080
+ENV APP_PORT=8080
+
+EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-    CMD curl -f http://localhost:8002/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-CMD ["uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8002", \
-     "--workers", "1", \
-     "--loop", "uvloop", \
-     "--http", "httptools", \
-     "--log-level", "warning"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --loop uvloop --http httptools --log-level info"]

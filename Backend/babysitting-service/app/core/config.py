@@ -30,14 +30,16 @@ class Settings(BaseSettings):
     # ── Redis ─────────────────────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # ── JWT ───────────────────────────────────────────────────────────────────
+    # ── JWT / Keycloak ────────────────────────────────────────────────────────
     JWT_SECRET: str = "changeme-in-production-use-256bit-random-secret"
-    JWT_ALGORITHM: str = "HS256"
+    JWT_ALGORITHM: str = "RS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    KEYCLOAK_REALM_PUBLIC_KEY: str | None = None
+    KEYCLOAK_REALM: str = "parentconnect"
 
     # ── Identity service ──────────────────────────────────────────────────────
     USE_MOCK_IDENTITY: bool = True
-    IDENTITY_SERVICE_URL: str = "http://identity-service:8001"
+    IDENTITY_SERVICE_URL: str = "http://identity-service:8080"
 
     # ── Business rules ────────────────────────────────────────────────────────
     # Minimum credit balance allowed (can be negative to allow debt)
@@ -51,17 +53,19 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "production", "test"] = "development"
 
     # ── Service ───────────────────────────────────────────────────────────────
-    SERVICE_PORT: int = 8002
+    PORT: int = 8080
+    APP_PORT: int | None = None
+    SERVICE_PORT: int = 8080
     SERVICE_NAME: str = "babysitting-service"
     SERVICE_VERSION: str = "0.1.0"
 
     # ── Eureka Service Discovery ───────────────────────────────────────────────
-    # URL du serveur Eureka (local sans Docker : http://localhost:8761/eureka/)
-    EUREKA_SERVER_URL: str = "http://localhost:8761/eureka/"
+    # URL du serveur Eureka partagé
+    EUREKA_SERVER_URL: str = "http://eureka-server:8761/eureka/"
     # Nom sous lequel le service s'enregistre dans Eureka (majuscules Eureka)
     EUREKA_APP_NAME: str = "PARENTCONNECT-BABYSITTING"
-    # Adresse réseau annoncée aux autres services (localhost en mode local)
-    EUREKA_INSTANCE_HOST: str = "localhost"
+    # Adresse réseau annoncée aux autres services
+    EUREKA_INSTANCE_HOST: str = "babysitting-service"
     # Intervalle entre chaque heartbeat (secondes)
     EUREKA_HEARTBEAT_INTERVAL: int = 30
     # Durée du bail Eureka (secondes) - doit être > heartbeat
@@ -69,12 +73,22 @@ class Settings(BaseSettings):
     # Activer/désactiver l'enregistrement Eureka
     EUREKA_ENABLED: bool = True
 
+    # ── RabbitMQ Message Broker ────────────────────────────────────────────────
+    RABBITMQ_HOST: str = "rabbitmq"
+    RABBITMQ_PORT: int = 5672
+    RABBITMQ_USER: str = "guest"
+    RABBITMQ_PASSWORD: str = "guest"
+    RABBITMQ_VHOST: str = "/"
+    RABBITMQ_EXCHANGE: str = "parentconnect.topic"
+    RABBITMQ_QUEUE: str = "babysitting_events_queue"
+    RABBITMQ_ENABLED: bool = True
+
     # ── Derived helpers ───────────────────────────────────────────────────────
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_db_url(cls, v: str) -> str:
-        if not v.startswith("postgresql"):
-            raise ValueError("DATABASE_URL must be a PostgreSQL URL")
+        if not (v.startswith("postgresql") or v.startswith("sqlite")):
+            raise ValueError("DATABASE_URL must be a PostgreSQL or SQLite URL")
         return v
 
     @field_validator("REDIS_URL")
@@ -83,6 +97,14 @@ class Settings(BaseSettings):
         if not v.startswith("redis"):
             raise ValueError("REDIS_URL must be a Redis URL")
         return v
+
+    @property
+    def port(self) -> int:
+        if self.APP_PORT is not None:
+            return self.APP_PORT
+        if self.PORT is not None:
+            return self.PORT
+        return self.SERVICE_PORT or 8080
 
     @property
     def is_production(self) -> bool:

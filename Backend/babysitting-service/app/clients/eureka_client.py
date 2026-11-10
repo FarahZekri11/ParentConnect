@@ -35,11 +35,12 @@ class EurekaClient:
     """
 
     def __init__(self) -> None:
-        self._settings = settings
+        self._settings = get_settings()
+        port = self._settings.port
         self._instance_id: str = (
             f"{self._settings.EUREKA_INSTANCE_HOST}"
             f":{self._settings.EUREKA_APP_NAME.lower()}"
-            f":{self._settings.SERVICE_PORT}"
+            f":{port}"
         )
         self._registered: bool = False
         self._heartbeat_task: Optional[asyncio.Task] = None  # type: ignore[type-arg]
@@ -55,8 +56,9 @@ class EurekaClient:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _build_instance_payload(self) -> dict:
+        self._settings = get_settings()
         ts = str(int(time.time() * 1000))
-        port = self._settings.SERVICE_PORT
+        port = self._settings.port
         host = self._settings.EUREKA_INSTANCE_HOST
         app = self._settings.EUREKA_APP_NAME.upper()
         base_url = f"http://{host}:{port}"

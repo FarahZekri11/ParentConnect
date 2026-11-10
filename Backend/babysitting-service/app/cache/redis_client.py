@@ -34,7 +34,12 @@ _RL_PFX = f"{_PFX}:ratelimit"
 
 class RedisClient:
     def __init__(self, url: str) -> None:
-        self._redis: Redis = from_url(url, decode_responses=True)
+        self._redis: Redis = from_url(
+            url,
+            decode_responses=True,
+            socket_connect_timeout=2.0,
+            socket_timeout=2.0,
+        )
 
     # ── Availability list cache ──────────────────────────────────────────────
 
@@ -153,8 +158,9 @@ class RedisClient:
     # ── Health ───────────────────────────────────────────────────────────────
 
     async def ping(self) -> bool:
+        import asyncio
         try:
-            return await self._redis.ping()  # type: ignore[return-value]
+            return await asyncio.wait_for(self._redis.ping(), timeout=1.0)  # type: ignore[return-value]
         except Exception:
             return False
 

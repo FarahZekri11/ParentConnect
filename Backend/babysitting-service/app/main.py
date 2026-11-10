@@ -28,6 +28,7 @@ from app.clients.eureka_client import get_eureka_client
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import RequestLoggingMiddleware, configure_logging, get_logger
+from app.events.publisher import close_rabbitmq_publisher, get_rabbitmq_publisher
 from app.routers import availability, bookings, credits, dev, matching, ratings, requests
 from app.schemas.common import HealthResponse
 
@@ -38,31 +39,56 @@ settings = get_settings()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     configure_logging()
     logger = get_logger("lifespan")
+    current_settings = get_settings()
 
-    # Initialise Redis
-    redis = RedisClient(settings.REDIS_URL)
-    if not await redis.ping():
-        logger.warning("redis_ping_failed", url=settings.REDIS_URL)
-    else:
-        logger.info("redis_connected", url=settings.REDIS_URL)
+    # Initialise Redis (optional, does not block startup or tests)
+    redis = RedisClient(current_settings.REDIS_URL)
+    if not current_settings.is_test:
+        if not await redis.ping():
+            logger.warning("redis_ping_failed", url=current_settings.REDIS_URL)
+        else:
+            logger.info("redis_connected", url=current_settings.REDIS_URL)
     set_redis_client(redis)
 
-    # ── Eureka registration (optionnel, ne bloque pas le démarrage) ─────────
+    # ── Eureka registration (service discovery) ─────────────────────────────
     eureka = get_eureka_client()
-    if settings.EUREKA_ENABLED:
-        registered = await eureka.register()
-        if registered:
-            await eureka.start_heartbeat_loop()
+    if current_settings.EUREKA_ENABLED and not current_settings.is_test:
+        try:
+            registered = await eureka.register()
+            if registered:
+                await eureka.start_heartbeat_loop()
+        except Exception as exc:
+            logger.warning("eureka_registration_failed", error=str(exc))
     else:
-        logger.info("eureka_disabled", reason="EUREKA_ENABLED=false")
+        logger.info("eureka_disabled", reason="EUREKA_ENABLED=false or test mode")
 
-    logger.info("service_started", service=settings.SERVICE_NAME, version=settings.SERVICE_VERSION)
+    # ── RabbitMQ publisher initialization ───────────────────────────────────
+    if current_settings.RABBITMQ_ENABLED and not current_settings.is_test:
+        try:
+            rmq_publisher = get_rabbitmq_publisher()
+            logger.info("rabbitmq_configured", host=current_settings.RABBITMQ_HOST, exchange=current_settings.RABBITMQ_EXCHANGE)
+        except Exception as exc:
+            logger.warning("rabbitmq_init_warning", error=str(exc))
+
+    logger.info(
+        "service_started",
+        service=current_settings.SERVICE_NAME,
+        version=current_settings.SERVICE_VERSION,
+        port=current_settings.port,
+    )
     yield
 
     # Cleanup
-    if settings.EUREKA_ENABLED:
-        await eureka.stop_heartbeat()
-        await eureka.deregister()
+    if current_settings.EUREKA_ENABLED and not current_settings.is_test:
+        try:
+            await eureka.stop_heartbeat()
+            await eureka.deregister()
+        except Exception as exc:
+            logger.warning("eureka_deregister_failed", error=str(exc))
+
+    if current_settings.RABBITMQ_ENABLED and not current_settings.is_test:
+        await close_rabbitmq_publisher()
+
     await redis.close()
     logger.info("service_shutdown")
 
@@ -98,18 +124,31 @@ def create_app() -> FastAPI:
     # ── Global exception handlers ─────────────────────────────────────────────
     register_exception_handlers(app)
 
-    # ── Health endpoint ───────────────────────────────────────────────────────
+    # ── Health endpoints (Public / No Auth) ───────────────────────────────────
     @app.get(
         "/health",
         response_model=HealthResponse,
         tags=["Health"],
         summary="Service health check",
     )
+    @app.get(
+        "/api/health",
+        response_model=HealthResponse,
+        tags=["Health"],
+        summary="Service health check (Gateway API route)",
+    )
+    @app.get(
+        "/api/babysitting/health",
+        response_model=HealthResponse,
+        tags=["Health"],
+        summary="Service health check (Prefix route)",
+    )
     async def health() -> HealthResponse:
+        current_settings = get_settings()
         return HealthResponse(
             status="ok",
-            service=settings.SERVICE_NAME,
-            version=settings.SERVICE_VERSION,
+            service=current_settings.SERVICE_NAME,
+            version=current_settings.SERVICE_VERSION,
             timestamp=datetime.now(tz=timezone.utc),
         )
 
