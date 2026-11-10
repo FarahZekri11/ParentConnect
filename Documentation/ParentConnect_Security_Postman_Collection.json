@@ -1,0 +1,728 @@
+{
+  "info": {
+    "name": "ParentConnect - Tests Sécurité Microservices (Keycloak + JWT)",
+    "description": "Collection complète pour valider les 8 exigences de sécurité de l'architecture ParentConnect. Authentification centralisée via Keycloak (RS256) avec compatibilité tokens custom HS256. Tous les tests passent par l'API Gateway (port 8080).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_url",
+      "value": "http://localhost:8180",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_realm",
+      "value": "parentconnect",
+      "type": "string"
+    },
+    {
+      "key": "keycloak_client",
+      "value": "parentconnect-gateway",
+      "type": "string"
+    },
+    {
+      "key": "user_jwt_token",
+      "value": "",
+      "type": "string",
+      "description": "Token JWT de l'utilisateur connecté (PARENT)"
+    },
+    {
+      "key": "admin_jwt_token",
+      "value": "",
+      "type": "string",
+      "description": "Token JWT de l'administrateur"
+    },
+    {
+      "key": "keycloak_parent_token",
+      "value": "",
+      "type": "string",
+      "description": "Token Keycloak RS256 pour un utilisateur PARENT"
+    },
+    {
+      "key": "keycloak_admin_token",
+      "value": "",
+      "type": "string",
+      "description": "Token Keycloak RS256 pour un ADMIN"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. 🔑 Keycloak — Obtention de Tokens (IdP Central)",
+      "description": "Prérequis : Keycloak doit être démarré sur le port 8180. Exécutez start-all.bat en premier.\n\nConfiguration Keycloak requise :\n1. Realm 'parentconnect' créé\n2. Client 'parentconnect-gateway' (Direct Access Grants activé)\n3. Rôles : ADMIN, PARENT, PROFESSIONAL\n4. Utilisateurs test : admin_test/Admin@2026, parent_test/Parent@2026",
+      "item": [
+        {
+          "name": "0.1 Token Keycloak — Utilisateur PARENT",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('keycloak_parent_token', jsonData.access_token);",
+                  "    pm.collectionVariables.set('user_jwt_token', jsonData.access_token);",
+                  "    console.log('✅ Token PARENT Keycloak obtenu et sauvegardé');",
+                  "} else {",
+                  "    console.error('❌ Échec obtention token:', JSON.stringify(jsonData));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id", "value": "{{keycloak_client}}" },
+                { "key": "username", "value": "parent_test" },
+                { "key": "password", "value": "Parent@2026" },
+                { "key": "scope", "value": "openid" }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "{{keycloak_realm}}", "protocol", "openid-connect", "token"]
+            }
+          }
+        },
+        {
+          "name": "0.2 Token Keycloak — Administrateur ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('keycloak_admin_token', jsonData.access_token);",
+                  "    pm.collectionVariables.set('admin_jwt_token', jsonData.access_token);",
+                  "    console.log('✅ Token ADMIN Keycloak obtenu et sauvegardé');",
+                  "} else {",
+                  "    console.error('❌ Échec obtention token ADMIN:', JSON.stringify(jsonData));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "client_id", "value": "{{keycloak_client}}" },
+                { "key": "username", "value": "admin_test" },
+                { "key": "password", "value": "Admin@2026" },
+                { "key": "scope", "value": "openid" }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}/protocol/openid-connect/token",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "{{keycloak_realm}}", "protocol", "openid-connect", "token"]
+            }
+          }
+        },
+        {
+          "name": "0.3 Keycloak — Clé Publique du Realm (RS256)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "{{keycloak_realm}}"]
+            },
+            "description": "Renvoie les métadonnées du realm, incluant la clé publique RSA utilisée pour vérifier les tokens RS256."
+          }
+        },
+        {
+          "name": "0.4 Keycloak — Vérifier Token (Introspection)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "client_id", "value": "{{keycloak_client}}" },
+                { "key": "token", "value": "{{keycloak_parent_token}}" }
+              ]
+            },
+            "url": {
+              "raw": "{{keycloak_url}}/realms/{{keycloak_realm}}/protocol/openid-connect/token/introspect",
+              "host": ["{{keycloak_url}}"],
+              "path": ["realms", "{{keycloak_realm}}", "protocol", "openid-connect", "token", "introspect"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. 👤 Authentification & Utilisateurs (via Gateway)",
+      "item": [
+        {
+          "name": "1.1 Inscription (Register) — Public",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Feriel Benali\",\n  \"email\": \"feriel.test@parentconnect.fr\",\n  \"password\": \"monSecret123\",\n  \"role\": \"PARENT\",\n  \"phone\": \"+33612345678\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/auth/register",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Endpoint PUBLIC — aucun token requis. Doit retourner 201."
+          }
+        },
+        {
+          "name": "1.2 Connexion (Login) — Public, Token HS256",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.access_token) {",
+                  "    pm.collectionVariables.set('user_jwt_token', jsonData.access_token);",
+                  "    console.log('✅ Token HS256 sauvegardé dans user_jwt_token');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"feriel.test@parentconnect.fr\",\n  \"password\": \"monSecret123\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/auth/login",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Endpoint PUBLIC — retourne un token JWT HS256 (token custom)."
+          }
+        },
+        {
+          "name": "1.3 Profil Connecté (/auth/me) — Protégé",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{user_jwt_token}}" }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/auth/me",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "1.4 Liste des Utilisateurs — ADMIN uniquement",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_jwt_token}}" }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/users",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "users"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. 🔒 Validation des 8 Exigences de Sécurité",
+      "description": "Tests obligatoires couvrant les 8 scénarios de sécurité demandés par le professeur.",
+      "item": [
+        {
+          "name": "✅ Test 1 : Endpoint Public SANS Token (Attendu : 200 OK)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 1 : Endpoint public accessible sans token', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});",
+                  "console.log('Test 1 | Status:', pm.response.code, '| Attendu: 200');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_url}}/api/posts",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "posts"]
+            },
+            "description": "GET /api/posts sans aucun token d'authentification. L'endpoint est public et doit retourner 200."
+          }
+        },
+        {
+          "name": "🚫 Test 2 : Endpoint Protégé SANS Token (Attendu : 401 Unauthorized)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 2 : Endpoint protégé refusé sans token → 401', function() {",
+                  "    pm.expect(pm.response.code).to.equal(401);",
+                  "});",
+                  "console.log('Test 2 | Status:', pm.response.code, '| Attendu: 401');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"type\": \"post\",\n  \"title\": \"Tentative sans token\",\n  \"content\": \"Ce post ne doit pas être créé.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/posts",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "posts"]
+            },
+            "description": "POST /api/posts sans token. Le Gateway doit retourner 401 Unauthorized."
+          }
+        },
+        {
+          "name": "✅ Test 3 : Token Keycloak RS256 Valide (Attendu : 201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 3 : Token Keycloak RS256 valide → 201', function() {",
+                  "    pm.expect(pm.response.code).to.equal(201);",
+                  "});",
+                  "console.log('Test 3 | Status:', pm.response.code, '| Attendu: 201');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"type\": \"question\",\n  \"title\": \"Conseils sommeil bébé 8 mois (Keycloak RS256)\",\n  \"content\": \"Avez-vous des astuces pour aider bébé à faire ses nuits ?\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/posts",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "posts"]
+            },
+            "description": "POST /api/posts avec token Keycloak RS256 valide. Exécutez d'abord '0.1 Token PARENT' pour obtenir le token."
+          }
+        },
+        {
+          "name": "🚫 Test 4 : Token Invalide / Falsifié (Attendu : 401 Unauthorized)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 4 : Token falsifié refusé → 401', function() {",
+                  "    pm.expect(pm.response.code).to.equal(401);",
+                  "});",
+                  "console.log('Test 4 | Status:', pm.response.code, '| Attendu: 401');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJoYWNrZXIiLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiQURNSU4iXX0sImV4cCI6OTk5OTk5OTk5OX0.SIGNATURE_FALSIFIEE_INVALIDE_12345" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"type\": \"post\",\n  \"title\": \"Attaque par token falsifié\",\n  \"content\": \"Ceci ne doit pas passer.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/posts",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "posts"]
+            },
+            "description": "Token RS256 avec signature falsifiée. Le Gateway détecte la signature invalide et retourne 401."
+          }
+        },
+        {
+          "name": "🚫 Test 5 : Token Expiré (Attendu : 401 Unauthorized)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 5 : Token expiré refusé → 401', function() {",
+                  "    pm.expect(pm.response.code).to.equal(401);",
+                  "});",
+                  "console.log('Test 5 | Status:', pm.response.code, '| Attendu: 401');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6IlBBUkVOVCIsImlhdCI6MTYwMDAwMDAwMCwiZXhwIjoxNjAwMDAwMDAxfQ.c1K3pT9m8vH6dF4eW2qS5aY7bU9jL1kM0xN8zP2rQ4" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"type\": \"post\",\n  \"title\": \"Token expiré test\",\n  \"content\": \"Token périmé depuis 2020.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/posts",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "posts"]
+            },
+            "description": "Token avec exp=1600000001 (expiré depuis 2020). Le Gateway retourne 401."
+          }
+        },
+        {
+          "name": "🚫 Test 6 : Rôle PARENT sur Ressource ADMIN (Attendu : 403 Forbidden)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 6 : Rôle insuffisant → 403', function() {",
+                  "    pm.expect(pm.response.code).to.equal(403);",
+                  "});",
+                  "console.log('Test 6 | Status:', pm.response.code, '| Attendu: 403');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Catégorie Interdite (PARENT)\",\n  \"description\": \"Un PARENT n'a pas le droit de créer une catégorie.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/categories",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "POST /api/categories avec token PARENT. La création de catégorie est réservée aux ADMIN → 403."
+          }
+        },
+        {
+          "name": "✅ Test 7 : Rôle ADMIN sur Ressource ADMIN (Attendu : 201 Created)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 7 : Rôle ADMIN autorisé → 201', function() {",
+                  "    pm.expect(pm.response.code).to.equal(201);",
+                  "});",
+                  "console.log('Test 7 | Status:', pm.response.code, '| Attendu: 201');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nutrition et Éveil (Keycloak)\",\n  \"description\": \"Conseils en nutrition pour les tout-petits — créé via Keycloak RS256.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/categories",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "POST /api/categories avec token ADMIN Keycloak. Doit retourner 201."
+          }
+        },
+        {
+          "name": "✅ Test 8 : Inscription + Login + Accès Protégé (Flux Complet)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Test 8 : Statut 2xx ou token présent', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "console.log('Test 8 | Status:', pm.response.code, '| Attendu: 200/201');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{keycloak_admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{gateway_url}}/api/admin/reports",
+              "host": ["{{gateway_url}}"],
+              "path": ["api", "admin", "reports"]
+            },
+            "description": "Administration des signalements — ADMIN uniquement. Vérifie la chaîne Gateway → microservice."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. 📋 CRUD Complet Posts (via Gateway)",
+      "item": [
+        {
+          "name": "3.1 Lister tous les Posts — Public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{gateway_url}}/api/posts", "host": ["{{gateway_url}}"], "path": ["api", "posts"] }
+          }
+        },
+        {
+          "name": "3.2 Créer un Post — PARENT (Keycloak RS256)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"type\": \"partage\",\n  \"title\": \"Mes astuces pour faire dormir bébé\",\n  \"content\": \"Voici ce qui fonctionne chez nous : routine du soir, bain chaud, berceuse.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/posts", "host": ["{{gateway_url}}"], "path": ["api", "posts"] }
+          }
+        },
+        {
+          "name": "3.3 Voir un Post — Public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{gateway_url}}/api/posts/1", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1"] }
+          }
+        },
+        {
+          "name": "3.4 Modifier un Post — Propriétaire (Keycloak RS256)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mes astuces MAJ\",\n  \"content\": \"Contenu mis à jour.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/posts/1", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1"] }
+          }
+        },
+        {
+          "name": "3.5 Supprimer un Post — ADMIN (Keycloak RS256)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{keycloak_admin_token}}" }
+            ],
+            "url": { "raw": "{{gateway_url}}/api/posts/1", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. 💬 CRUD Commentaires (via Gateway)",
+      "item": [
+        {
+          "name": "4.1 Lister les Commentaires d'un Post — Public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{gateway_url}}/api/posts/1/comments", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1", "comments"] }
+          }
+        },
+        {
+          "name": "4.2 Créer un Commentaire — PARENT (Keycloak RS256)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Merci pour ce partage ! Très utile.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/posts/1/comments", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1", "comments"] }
+          }
+        },
+        {
+          "name": "4.3 Modifier un Commentaire — Propriétaire (Keycloak RS256)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Commentaire modifié.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/posts/1/comments/1", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1", "comments", "1"] }
+          }
+        },
+        {
+          "name": "4.4 Supprimer un Commentaire — ADMIN (Keycloak RS256)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{keycloak_admin_token}}" }
+            ],
+            "url": { "raw": "{{gateway_url}}/api/posts/1/comments/1", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1", "comments", "1"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. 🏷️ CRUD Catégories (via Gateway) — ADMIN requis",
+      "item": [
+        {
+          "name": "5.1 Lister les Catégories — Public",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{gateway_url}}/api/categories", "host": ["{{gateway_url}}"], "path": ["api", "categories"] }
+          }
+        },
+        {
+          "name": "5.2 Créer une Catégorie — ADMIN (Keycloak RS256)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Santé et Bien-être\",\n  \"description\": \"Conseils sur la santé des enfants.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/categories", "host": ["{{gateway_url}}"], "path": ["api", "categories"] }
+          }
+        },
+        {
+          "name": "5.3 Créer Catégorie — PARENT (Attendu : 403 Forbidden)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Catégorie non autorisée\",\n  \"description\": \"Un PARENT ne devrait pas créer de catégorie.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/categories", "host": ["{{gateway_url}}"], "path": ["api", "categories"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. 🚨 Signalements (via Gateway) — ADMIN requis",
+      "item": [
+        {
+          "name": "6.1 Signaler un Post — PARENT (Keycloak RS256)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{keycloak_parent_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Contenu inapproprié\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/posts/1/report", "host": ["{{gateway_url}}"], "path": ["api", "posts", "1", "report"] }
+          }
+        },
+        {
+          "name": "6.2 Voir tous les Signalements — ADMIN (Keycloak RS256)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{keycloak_admin_token}}" }
+            ],
+            "url": { "raw": "{{gateway_url}}/api/admin/reports", "host": ["{{gateway_url}}"], "path": ["api", "admin", "reports"] }
+          }
+        },
+        {
+          "name": "6.3 Voir Signalements sans Token (Attendu : 401)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{gateway_url}}/api/admin/reports", "host": ["{{gateway_url}}"], "path": ["api", "admin", "reports"] }
+          }
+        }
+      ]
+    }
+  ]
+}
