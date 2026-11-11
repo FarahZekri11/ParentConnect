@@ -53,7 +53,7 @@ func (p *rabbitPublisher) PublishMessageSent(ctx context.Context, msg *models.Me
 	return ch.PublishWithContext(
 		ctx,
 		EventsExchange,
-		"messaging.message.sent",
+		"messaging.message.sent", // routing key : <service>.<entite>.<action>
 		false, // mandatory
 		false, // immediate
 		amqp.Publishing{

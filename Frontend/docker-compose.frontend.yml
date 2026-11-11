@@ -1,0 +1,40 @@
+version: '3.8'
+
+# ============================================================
+# docker-compose.frontend.yml – ParentConnect Frontend
+#
+# Déploiement du conteneur Frontend sur le réseau partagé
+# parentconnect-network avec routage vers l'API Gateway centralisé.
+#
+# Démarrage :
+#   docker compose -f docker-compose.frontend.yml up -d --build
+# ============================================================
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # En production conteneurisée ou locale, l'API Gateway centralisé sur le port 8080
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8080}
+    container_name: parentconnect-frontend
+    image: parentconnect/frontend:latest
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - parentconnect-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+# Réseau partagé externe ParentConnect (géré par l'infrastructure centrale)
+networks:
+  parentconnect-network:
+    external: true

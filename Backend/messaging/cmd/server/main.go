@@ -32,12 +32,12 @@ import (
 // @description     Microservice de messagerie instantanée, notifications et conversations pour la plateforme ParentConnect.
 // @contact.name    Équipe Messaging - ParentConnect
 // @license.name    Apache 2.0
-// @host            localhost:8085
+// @host            localhost:8080
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Entrez le token JWT sous la forme: Bearer <votre_token>
+// @description Entrez le token JWT Keycloak RS256 sous la forme: Bearer <votre_token>
 func main() {
 	// 1. Initialisation de la configuration
 	cfg := config.Load()
@@ -150,12 +150,24 @@ func main() {
 
 	// 6. Initialisation du routeur Gin avec middlewares de sécurité et résilience
 	router := gin.New()
+
+	// Configuration des proxies de confiance (réseaux Docker internes)
+	// Cela permet à Gin de correctement résoudre l'IP réelle du client via X-Forwarded-For
+	// lorsque les requêtes transitent par Nginx ou Spring Cloud Gateway.
+	router.SetTrustedProxies([]string{"172.0.0.0/8", "10.0.0.0/8", "192.168.0.0/16"})
+
 	router.Use(gin.Recovery())
 	router.Use(middleware.CORSMiddleware())
 	router.Use(middleware.SecurityHeadersMiddleware())
 	router.Use(middleware.MaxBodySizeMiddleware(1 << 20)) // 1 Mo max
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.StructuredLoggerMiddleware(zapLogger))
+
+	// Middleware de validation que les requêtes transitent bien par la Gateway
+	// (activé en production via TRUSTED_PROXIES_ENABLED=true)
+	if cfg.TrustedProxiesEnabled {
+		router.Use(middleware.TrustedProxyMiddleware(cfg))
+	}
 
 	// Initialisation des limiteurs de débit (Rate Limiting)
 	globalRateLimiter := middleware.NewRateLimiter(redisClient, 120, 1*time.Minute) // 120 req/min
@@ -166,6 +178,7 @@ func main() {
 	// 7. Enregistrement des routes de supervision et documentation (publiques)
 	healthHandler := handlers.NewHealthHandler(mongoDB, redisClient)
 	router.GET("/health", healthHandler.HealthCheck)
+	router.GET("/api/health", healthHandler.HealthCheck) // Alias pour la convention API Gateway
 	router.GET("/ready", healthHandler.ReadinessCheck)
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

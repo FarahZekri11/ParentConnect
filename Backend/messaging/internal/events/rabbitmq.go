@@ -11,10 +11,16 @@ import (
 )
 
 const (
-	EventsExchange = "parentconnect.events"
-	EventsQueue    = "messaging.events"
-	DLXExchange    = "parentconnect.dlx"
-	DLQQueue       = "messaging.dlq"
+	// EventsExchange est l'exchange topic partagé par tous les microservices ParentConnect.
+	// Toutes les publications doivent utiliser cet exchange avec des routing keys explicites.
+	EventsExchange = "parentconnect.topic"
+
+	// EventsQueue est la queue dédiée au service Messaging (convention : <service>_events_queue).
+	EventsQueue = "messaging_events_queue"
+
+	// DLXExchange / DLQQueue : circuit de Dead Letter pour les messages rejetés.
+	DLXExchange = "parentconnect.dlx"
+	DLQQueue    = "messaging_dlq"
 )
 
 // RabbitClient gère la connexion, le cycle de vie et la topologie RabbitMQ
@@ -134,6 +140,7 @@ func (c *RabbitClient) setupTopology() error {
 	}
 
 	// 5. Liaisons (Bindings) aux routing keys d'intérêt pour la messagerie
+	// Convention : <service>.<entite>.<action>
 	routingKeys := []string{
 		"babysitting.booking.accepted",
 		"geo.neighbor.joined",

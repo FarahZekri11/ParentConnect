@@ -60,7 +60,7 @@ type EurekaInstancePayload struct {
 func NewEurekaClient(serverURL, appName, instanceHost, portStr string, logger *zap.Logger) *EurekaClient {
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
-		port = 8085
+		port = 8080 // Port interne standardisé ParentConnect
 	}
 	normalizedURL := strings.TrimRight(serverURL, "/")
 	normalizedAppName := strings.ToUpper(appName)

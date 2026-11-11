@@ -1,0 +1,127 @@
+version: '3.8'
+
+# ============================================================
+# docker-compose.local-test.yml – Messaging Service
+#
+# Environnement de test local autonome (développeur).
+# Inclut uniquement le service Messaging et ses dépendances
+# propres (MongoDB + Redis). RabbitMQ, Eureka, Gateway et
+# Keycloak sont mockés / désactivés pour le test local.
+#
+# Démarrage :
+#   docker compose -f docker-compose.local-test.yml up -d
+#
+# Arrêt et nettoyage :
+#   docker compose -f docker-compose.local-test.yml down -v
+# ============================================================
+
+services:
+
+  # ── Microservice Messaging ──────────────────────────────────
+  messaging-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: messaging-local
+    ports:
+      - "8080:8080"       # API REST + WebSocket
+    environment:
+      # ── Général ──────────────────────────────────────────
+      - PORT=8080
+      - APP_ENV=development
+
+      # ── MongoDB local ─────────────────────────────────────
+      - MONGO_URL=mongodb://messaging-mongo-local:27017
+      - MONGO_DB=messaging_db
+
+      # ── Redis local ───────────────────────────────────────
+      - REDIS_URL=redis://redis-local:6379/0
+
+      # ── RabbitMQ désactivé en local (aucune dépendance externe) ─
+      # Le service démarre quand même – RabbitMQ sera tenté en arrière-plan
+      # et différé gracieusement si indisponible.
+      - RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+
+      # ── Auth : HS256 pour simplifier le test local ────────
+      # Générez un token de test via : https://jwt.io
+      - JWT_ALGORITHM=HS256
+      - JWT_SECRET=local-dev-secret-do-not-use-in-production
+      - KEYCLOAK_REALM_PUBLIC_KEY=
+      - JWT_PUBLIC_KEY=
+
+      # ── Pas de découverte Eureka en local ─────────────────
+      - EUREKA_ENABLED=false
+
+      # ── Clé interne (valeur fixe pour les tests) ──────────
+      - INTERNAL_API_KEY=local-internal-key
+
+      # ── Limites ───────────────────────────────────────────
+      - MAX_MESSAGE_LENGTH=2000
+
+      # ── Pas de validation Gateway en local ────────────────
+      - TRUSTED_PROXIES_ENABLED=false
+
+    depends_on:
+      messaging-mongo-local:
+        condition: service_healthy
+      redis-local:
+        condition: service_healthy
+    networks:
+      - messaging-local-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  # ── MongoDB dédié au service Messaging ─────────────────────
+  messaging-mongo-local:
+    image: mongo:7.0
+    container_name: messaging-mongo-local
+    ports:
+      - "27018:27017"   # Port hôte 27018 pour éviter les conflits
+    volumes:
+      - messaging_mongo_local_data:/data/db
+    networks:
+      - messaging-local-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── Redis local (Pub/Sub WebSocket + Rate Limiting) ─────────
+  redis-local:
+    image: redis:7.2-alpine
+    container_name: redis-local
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - messaging_redis_local_data:/data
+    networks:
+      - messaging-local-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+# ── Réseau bridge local isolé ────────────────────────────────
+networks:
+  messaging-local-net:
+    driver: bridge
+    name: messaging-local-net
+
+# ── Volumes persistants locaux ───────────────────────────────
+volumes:
+  messaging_mongo_local_data:
+    name: messaging_mongo_local_data
+  messaging_redis_local_data:
+    name: messaging_redis_local_data

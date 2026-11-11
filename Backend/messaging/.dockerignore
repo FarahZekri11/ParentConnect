@@ -1,0 +1,53 @@
+# ============================================================
+# .dockerignore – Messaging Service (Go / Gin)
+# Exclut tout ce qui ne doit pas être copié dans l'image Docker
+# ============================================================
+
+# Binaires et artefacts de build locaux
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Dépendances locales (non pertinentes, Go télécharge via go mod)
+vendor/
+
+# Fichiers secrets et configuration locale
+.env
+*.local.env
+*.pem
+*.key
+
+# Fichiers Docker de test local (ne pas embarquer dans l'image)
+docker-compose*.yml
+Dockerfile*
+
+# Fichiers de test et couverture
+tests/
+*.out
+*.test
+coverage.html
+
+# Répertoires de gateway locale (uniquement pour docker-compose local)
+gateway/
+
+# Documentation et Postman
+docs/
+postman/
+
+# IDE et OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitkeep
+
+# README et documentation projet
+*.md

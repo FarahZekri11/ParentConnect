@@ -1,5 +1,5 @@
 # ==============================================================================
-# Configuration Spring Cloud Gateway pour l'intégration de ParentConnect Messaging
+# Spring Cloud Gateway – Configuration de routage sécurisé pour ParentConnect
 # ==============================================================================
 server:
   port: 8080 # Port public de l'API Gateway Spring Cloud
@@ -13,16 +13,65 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+
+      # ========================================================================
+      # Filtres globaux appliqués à TOUTES les routes
+      # ========================================================================
+      default-filters:
+        # Nettoyage du cookie (ne jamais propager les cookies session au backend)
+        - RemoveRequestHeader=Cookie
+        - RemoveRequestHeader=Set-Cookie
+
+        # En-têtes de sécurité injectés dans TOUTES les réponses sortantes
+        - AddResponseHeader=X-Frame-Options, DENY
+        - AddResponseHeader=X-Content-Type-Options, nosniff
+        - AddResponseHeader=X-XSS-Protection, 1; mode=block
+        - AddResponseHeader=Referrer-Policy, strict-origin-when-cross-origin
+
+        # Suppression des en-têtes internes sensibles avant de répondre au client
+        - RemoveResponseHeader=X-Powered-By
+        - RemoveResponseHeader=Server
+
       routes:
+        # ======================================================================
+        # 0. Blocage explicite des routes internes inter-services (/internal/**)
+        #    Ces routes sont réservées aux communications directes sur le réseau
+        #    Docker interne et ne doivent JAMAIS transiter par la Gateway publique.
+        # ======================================================================
+        - id: block-internal-routes
+          uri: no://op
+          predicates:
+            - Path=/internal/**
+          filters:
+            # SetStatus renvoie 403 Forbidden sans proxifier la requête
+            - SetStatus=403
+
+        # ======================================================================
         # 1. Routage des endpoints REST du service de messagerie
+        # ======================================================================
         - id: messaging-service-api
           uri: lb://MESSAGING-SERVICE
           predicates:
             - Path=/api/conversations/**, /api/messages/**, /api/notifications/**
           filters:
             - StripPrefix=0
+            # Injection de l'en-tête interne pour les communications service-à-service
+            # (le microservice Go vérifie X-Internal-Key sur ses routes /internal/*)
+            # - AddRequestHeader=X-Internal-Key, ${INTERNAL_API_KEY}
 
-        # 2. Routage WebSocket temps réel (Upgrade HTTP/1.1)
+            # Rate Limiting avec Redis (spring-cloud-starter-gateway + spring-boot-starter-data-redis)
+            # Décommentez et configurez le bean RedisRateLimiter dans votre @Configuration :
+            #
+            # - name: RequestRateLimiter
+            #   args:
+            #     redis-rate-limiter.replenishRate: 20     # requêtes/seconde accordées
+            #     redis-rate-limiter.burstCapacity: 40     # pic de trafic autorisé
+            #     redis-rate-limiter.requestedTokens: 1
+            #     key-resolver: "#{@userKeyResolver}"      # Bean KeyResolver par user (JWT sub)
+
+        # ======================================================================
+        # 2. Routage WebSocket temps réel (Upgrade HTTP/1.1 -> WebSocket)
+        # ======================================================================
         - id: messaging-service-ws
           uri: lb:ws://MESSAGING-SERVICE
           predicates:
@@ -30,23 +79,34 @@ spring:
           filters:
             - StripPrefix=0
 
-        # 3. Documentation Swagger UI
+        # ======================================================================
+        # 3. Documentation Swagger UI (pas de JWT requis, accès public)
+        # ======================================================================
         - id: messaging-service-swagger
           uri: lb://MESSAGING-SERVICE
           predicates:
             - Path=/swagger/**
           filters:
             - StripPrefix=0
+            # Le header Authorization est supprimé pour les endpoints Swagger publics
+            # afin d'éviter de propager accidentellement un JWT aux pages de doc.
+            - RemoveRequestHeader=Authorization
 
-        # 4. Sondes de santé & supervision
+        # ======================================================================
+        # 4. Sondes de santé & supervision (pas de JWT, accès public limité)
+        # ======================================================================
         - id: messaging-service-health
           uri: lb://MESSAGING-SERVICE
           predicates:
             - Path=/health, /ready
           filters:
             - StripPrefix=0
+            # Suppression du JWT sur les routes de health check (non requis)
+            - RemoveRequestHeader=Authorization
 
+# ==============================================================================
 # Configuration du client Eureka Discovery pour la Gateway
+# ==============================================================================
 eureka:
   client:
     service-url:
@@ -55,3 +115,14 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
+
+# ==============================================================================
+# [OPTIONNEL] Configuration Redis pour le RequestRateLimiter Spring Cloud Gateway
+# Décommentez si vous activez le filtre RequestRateLimiter ci-dessus.
+# ==============================================================================
+# spring:
+#   data:
+#     redis:
+#       host: ${REDIS_HOST:redis}
+#       port: ${REDIS_PORT:6379}
+#       timeout: 2000ms

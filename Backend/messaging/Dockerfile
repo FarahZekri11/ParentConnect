@@ -47,11 +47,11 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
-# Exposition du port du service
-EXPOSE 8085
+# Port interne standardisé ParentConnect (paramétrable via PORT ou APP_PORT)
+EXPOSE 8080
 
 # Sonde de vie au niveau conteneur Docker
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8085/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/messaging-service"]

@@ -1,0 +1,87 @@
+version: '3.8'
+
+# ============================================================
+# docker-compose.service.yml – Messaging Service
+#
+# Déploiement en intégration sur le réseau partagé ParentConnect.
+# Rattaché au réseau externe géré par l'intégrateur.
+#
+# Prérequis : le réseau "parentconnect-network" doit exister :
+#   docker network create parentconnect-network
+#
+# Démarrage :
+#   docker compose -f docker-compose.service.yml up -d
+# ============================================================
+
+services:
+
+  # ── Microservice Messaging (Go + Gin + WebSocket) ──────────
+  messaging-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parentconnect-messaging
+    image: parentconnect/messaging-service:latest
+
+    # Port interne standardisé 8080 (non exposé en production : la Gateway route en interne)
+    expose:
+      - "8080"
+    # Décommenter uniquement pour du débogage ciblé :
+    # ports:
+    #   - "8080:8080"
+
+    environment:
+      # ── Général ──────────────────────────────────────────
+      - PORT=8080
+      - APP_ENV=production
+
+      # ── Base de données MongoDB dédiée ───────────────────
+      - MONGO_URL=${MONGO_URL:-mongodb://messaging-mongo:27017}
+      - MONGO_DB=${MONGO_DB:-messaging_db}
+
+      # ── Redis ─────────────────────────────────────────────
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+
+      # ── RabbitMQ (serveur partagé géré par l'intégrateur) ─
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+
+      # ── Authentification Keycloak RS256 ───────────────────
+      # Fournir la clé publique PEM du Realm 'parentconnect' via KEYCLOAK_REALM_PUBLIC_KEY
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-RS256}
+      - KEYCLOAK_REALM_PUBLIC_KEY=${KEYCLOAK_REALM_PUBLIC_KEY}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+
+      # ── Sécurité interne inter-services ───────────────────
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-internal-secret-key-parentconnect}
+
+      # ── Limites métier ────────────────────────────────────
+      - MAX_MESSAGE_LENGTH=${MAX_MESSAGE_LENGTH:-2000}
+
+      # ── Eureka (serveur partagé géré par l'intégrateur) ───
+      - EUREKA_ENABLED=${EUREKA_ENABLED:-true}
+      - EUREKA_SERVER_URL=${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      - SERVICE_NAME=PARENTCONNECT-MESSAGING
+      - INSTANCE_HOST=messaging-service
+
+      # ── Gateway ───────────────────────────────────────────
+      - TRUSTED_PROXIES_ENABLED=${TRUSTED_PROXIES_ENABLED:-true}
+
+    networks:
+      - parentconnect-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+# ── Réseau externe partagé (géré par l'intégrateur) ─────────
+# NE PAS recréer ce réseau ici – il est créé une seule fois
+# par le fichier d'infrastructure centrale de l'équipe.
+networks:
+  parentconnect-network:
+    external: true
