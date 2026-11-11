@@ -30,6 +30,11 @@ export class SidebarComponent {
       route: '/app/dashboard'
     },
     {
+      label: 'Mon Quartier',
+      icon: 'explore',
+      route: '/app/neighborhood'
+    },
+    {
       label: 'Marketplace',
       icon: 'storefront',
       route: '/app/marketplace'

@@ -307,3 +307,7 @@ export interface ToastMessage {
 
 export interface CategoryOption { value: string; label: string; icon: string; }
 export interface SelectOption   { value: string; label: string; }
+
+// --- Geo & Neighborhood ---
+export * from '../../core/models/geo.models';
+

@@ -1,0 +1,719 @@
+<div class="neighborhood-page page-container">
+
+  <!-- Toast Notification -->
+  <div *ngIf="toast" class="toast-floating" [class]="'toast-' + toast.type">
+    <span class="material-icons-round toast-icon">
+      {{ toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info' }}
+    </span>
+    <span class="toast-message">{{ toast.message }}</span>
+  </div>
+
+  <!-- Hero / Header Section -->
+  <header class="neighborhood-header">
+    <div class="header-content">
+      <div class="header-titles">
+        <span class="header-eyebrow">
+          <span class="material-icons-round icon-sm">explore</span>
+          GÉOLOCALISATION SÉCURISÉE & ENTRAIDE LOCALE
+        </span>
+        <h1 class="page-title">Mon Quartier & Voisins Solidaires</h1>
+        <p class="page-subtitle">
+          Rencontrez les parents proches de chez vous, découvrez les points de rendez-vous sûrs pour vos échanges Marketplace et tissez des cercles de confiance locaux.
+        </p>
+
+        <!-- Privacy & Neighborhood Badges Bar -->
+        <div class="privacy-badges-bar">
+          <div class="badge-pill privacy-pill" title="Votre position exacte n'est jamais divulguée">
+            <span class="material-icons-round icon-sm">shield</span>
+            <span>Position floutée (~200m)</span>
+          </div>
+
+          <div class="badge-pill neighborhood-pill">
+            <span class="material-icons-round icon-sm">location_city</span>
+            <span>{{ currentLocation?.neighborhood_name || 'Lafayette, Tunis' }}</span>
+          </div>
+
+          <div class="badge-pill verification-pill" [class.verified]="currentLocation?.verified">
+            <span class="material-icons-round icon-sm">verified_user</span>
+            <span>{{ currentLocation?.verified ? 'Adresse vérifiée par les pairs' : 'Adresse non vérifiée' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="btn btn-secondary" (click)="openLocationModal()" title="Mettre à jour ma zone">
+          <span class="material-icons-round icon-md">edit_location</span>
+          <span class="btn-text">Ma position</span>
+        </button>
+
+        <button type="button" class="btn btn-primary" (click)="setTab('verification')">
+          <span class="material-icons-round icon-md">verified</span>
+          <span>Vérifier mon adresse</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs Bar -->
+    <div class="tabs-nav-bar card">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab === 'nearby'"
+        (click)="setTab('nearby')"
+      >
+        <span class="material-icons-round icon-sm">people</span>
+        <span>Voisins & Proximité ({{ nearbyParents.length }})</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab === 'meeting-points'"
+        (click)="setTab('meeting-points')"
+      >
+        <span class="material-icons-round icon-sm">place</span>
+        <span>Points de Rencontre Sûrs ({{ filteredMeetingPoints.length }})</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab === 'circles'"
+        (click)="setTab('circles')"
+      >
+        <span class="material-icons-round icon-sm">supervised_user_circle</span>
+        <span>Cercles de Confiance</span>
+      </button>
+
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab === 'verification'"
+        (click)="setTab('verification')"
+      >
+        <span class="material-icons-round icon-sm">security</span>
+        <span>Vérification d'Adresse</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 1: VOISINS & PROXIMITÉ (Anti-triangulation) -->
+  <!-- ========================================================================= -->
+  <section *ngIf="activeTab === 'nearby'" class="tab-content nearby-section">
+
+    <!-- Anti-triangulation Privacy Notice -->
+    <div class="privacy-notice-card card">
+      <div class="notice-icon-box">
+        <span class="material-icons-round">verified</span>
+      </div>
+      <div class="notice-text">
+        <h4>Confidentialité garantie & Anti-triangulation</h4>
+        <p>
+          Pour protéger votre vie privée et celle de vos enfants, aucune coordonnée GPS brute n’est stockée ou transmise.
+          Les distances affichées ci-dessous sont <strong>systématiquement arrondies aux 100 mètres près</strong> (ex : 200m, 400m, 1.2km)
+          afin d’empêcher toute triangulation géométrique.
+        </p>
+      </div>
+
+      <!-- Radius Filter Pills -->
+      <div class="radius-filter-pills">
+        <span class="radius-label">Rayon :</span>
+        <button
+          *ngFor="let opt of radiusOptions"
+          type="button"
+          class="radius-pill-btn"
+          [class.active]="selectedRadius === opt.value"
+          (click)="onRadiusChange(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Parents Grid -->
+    <div *ngIf="nearbyParents.length > 0" class="parents-grid">
+      <div *ngFor="let parent of nearbyParents" class="parent-card card">
+        <div class="parent-card-header">
+          <img [src]="parent.avatar" [alt]="parent.displayName" class="parent-avatar" />
+
+          <div class="parent-info">
+            <div class="parent-title-row">
+              <h3 class="parent-name">{{ parent.displayName }}</h3>
+              <span *ngIf="parent.verified" class="verified-icon" title="Adresse vérifiée par les voisins">
+                <span class="material-icons-round icon-sm">verified</span>
+              </span>
+            </div>
+            <span class="parent-neighborhood">Quartier {{ parent.neighborhood }}</span>
+          </div>
+
+          <!-- Rounded distance badge -->
+          <div class="distance-badge" title="Distance arrondie à 100m près">
+            <span class="material-icons-round icon-sm">near_me</span>
+            <span>~{{ parent.distance_m }} m</span>
+          </div>
+        </div>
+
+        <div class="parent-card-body">
+          <div class="meta-row">
+            <span class="meta-item">
+              <span class="material-icons-round icon-sm">child_care</span>
+              {{ parent.childrenCount }} enfant{{ (parent.childrenCount || 1) > 1 ? 's' : '' }}
+            </span>
+
+            <span class="meta-item trust-badge" [class]="'trust-' + (parent.trustLevel || 'none')">
+              <span class="material-icons-round icon-sm">
+                {{ parent.trustLevel === 'close' ? 'favorite' : parent.trustLevel === 'neighborhood' ? 'group' : 'shield' }}
+              </span>
+              <span>
+                {{ parent.trustLevel === 'close' ? 'Cercle Proche' : parent.trustLevel === 'neighborhood' ? 'Cercle Quartier' : 'Voisin' }}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <div class="parent-card-actions">
+          <button
+            type="button"
+            class="btn btn-outline btn-sm action-btn"
+            (click)="testProximity(parent)"
+            title="Tester la distance Haversine avec ce parent"
+          >
+            <span class="material-icons-round icon-sm">straighten</span>
+            <span>Proximité</span>
+          </button>
+
+          <button
+            *ngIf="parent.trustLevel !== 'close'"
+            type="button"
+            class="btn btn-secondary btn-sm action-btn"
+            (click)="quickAddToCircle(parent, 'close')"
+            title="Ajouter à mon cercle de confiance proche"
+          >
+            <span class="material-icons-round icon-sm">favorite_border</span>
+            <span>Confiance</span>
+          </button>
+
+          <a
+            routerLink="/app/messages"
+            class="btn btn-primary btn-sm action-btn"
+            title="Envoyer un message sécurisé"
+          >
+            <span class="material-icons-round icon-sm">chat</span>
+            <span>Message</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="nearbyParents.length === 0" class="empty-state-card card">
+      <span class="material-icons-round empty-icon">person_search</span>
+      <h3>Aucun parent détecté dans ce rayon</h3>
+      <p>Essayez d'élargir le rayon de recherche à 2.5 km ou 5 km, ou mettez à jour votre position.</p>
+      <button type="button" class="btn btn-primary" (click)="onRadiusChange(5000)">
+        Élargir à 5 km
+      </button>
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 2: POINTS DE RENCONTRE SÛRS (Safe Meeting Points) -->
+  <!-- ========================================================================= -->
+  <section *ngIf="activeTab === 'meeting-points'" class="tab-content meeting-points-section">
+
+    <!-- Filters & Neighborhood Selector -->
+    <div class="mp-toolbar card">
+      <div class="mp-type-filters">
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedMeetingPointType === 'all'"
+          (click)="selectedMeetingPointType = 'all'"
+        >
+          Tous les lieux sûrs
+        </button>
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedMeetingPointType === 'park'"
+          (click)="selectedMeetingPointType = 'park'"
+        >
+          <span class="material-icons-round icon-sm">park</span>
+          Parcs publics
+        </button>
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedMeetingPointType === 'daycare'"
+          (click)="selectedMeetingPointType = 'daycare'"
+        >
+          <span class="material-icons-round icon-sm">child_care</span>
+          Crèches & Écoles
+        </button>
+        <button
+          type="button"
+          class="filter-pill-btn"
+          [class.active]="selectedMeetingPointType === 'town_hall'"
+          (click)="selectedMeetingPointType = 'town_hall'"
+        >
+          <span class="material-icons-round icon-sm">account_balance</span>
+          Mairies & Espaces Publics
+        </button>
+      </div>
+
+      <div class="nh-selector">
+        <label for="nhSelect">Quartier :</label>
+        <select id="nhSelect" class="form-select" [(ngModel)]="selectedNeighborhoodId">
+          <option value="">Tous les quartiers</option>
+          <option *ngFor="let nh of neighborhoods" [value]="nh.id">
+            {{ nh.name }} ({{ nh.city }})
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Meeting Points Cards Grid -->
+    <div class="meeting-points-grid">
+      <div *ngFor="let mp of filteredMeetingPoints" class="mp-card card">
+        <div class="mp-card-header">
+          <div class="mp-type-icon-box" [class]="'type-' + mp.type">
+            <span class="material-icons-round">{{ getMeetingPointIcon(mp.type) }}</span>
+          </div>
+
+          <div class="mp-titles">
+            <span class="mp-type-tag">{{ getMeetingPointTypeLabel(mp.type) }}</span>
+            <h3 class="mp-name">{{ mp.name }}</h3>
+            <span class="mp-address">
+              <span class="material-icons-round icon-sm">place</span>
+              {{ mp.address || mp.neighborhood_name }}
+            </span>
+          </div>
+        </div>
+
+        <p class="mp-description">{{ mp.description }}</p>
+
+        <!-- Safety features tags -->
+        <div class="mp-safety-features" *ngIf="mp.safetyFeatures && mp.safetyFeatures.length > 0">
+          <span *ngFor="let feat of mp.safetyFeatures" class="safety-tag">
+            <span class="material-icons-round icon-sm">check_circle</span>
+            {{ feat }}
+          </span>
+        </div>
+
+        <div class="mp-card-footer">
+          <div class="coords-pill">
+            <span class="material-icons-round icon-sm">navigation</span>
+            <span>{{ mp.location.coordinates[1].toFixed(4) }}° N, {{ mp.location.coordinates[0].toFixed(4) }}° E</span>
+          </div>
+
+          <a
+            routerLink="/app/marketplace"
+            class="btn btn-secondary btn-sm"
+            title="Proposer ce point de rencontre pour une remise Marketplace"
+          >
+            <span class="material-icons-round icon-sm">storefront</span>
+            <span>Utiliser sur Marketplace</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Safety Best Practices Card -->
+    <div class="safety-guide-card card">
+      <div class="guide-header">
+        <span class="material-icons-round guide-icon">security</span>
+        <h3>Guide des Échanges Sereins entre Parents</h3>
+      </div>
+      <div class="guide-grid">
+        <div class="guide-item">
+          <span class="guide-num">1</span>
+          <div>
+            <strong>Lieux publics privilégiés</strong>
+            <p>Privilégiez les parcs publics, entrées d'écoles ou parvis de mairie identifiés sur la carte.</p>
+          </div>
+        </div>
+        <div class="guide-item">
+          <span class="guide-num">2</span>
+          <div>
+            <strong>Horaires de jour</strong>
+            <p>Fixez vos rendez-vous de préférence en pleine journée ou lors des heures de sortie scolaire.</p>
+          </div>
+        </div>
+        <div class="guide-item">
+          <span class="guide-num">3</span>
+          <div>
+            <strong>Profils vérifiés</strong>
+            <p>Favorisez les membres arborant le badge d'adresse vérifiée par les voisins de votre quartier.</p>
+          </div>
+        </div>
+        <div class="guide-item">
+          <span class="guide-num">4</span>
+          <div>
+            <strong>Paiement solidaire</strong>
+            <p>Pour les dons ou prêts de poussettes/sièges auto, validez l'état du matériel ensemble sur place.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 3: CERCLES DE CONFIANCE (Trust Circles) -->
+  <!-- ========================================================================= -->
+  <section *ngIf="activeTab === 'circles'" class="tab-content circles-section">
+    <div class="circles-intro card">
+      <div class="intro-icon">
+        <span class="material-icons-round">supervised_user_circle</span>
+      </div>
+      <div class="intro-text">
+        <h3>Gérez la visibilité de vos échanges</h3>
+        <p>
+          Les Cercles de Confiance vous permettent de compartimenter vos annonces Marketplace, demandes de garde de dernière minute et événements entre vos voisins immédiats et la communauté élargie.
+        </p>
+      </div>
+    </div>
+
+    <div class="circles-grid">
+
+      <!-- Close Circle -->
+      <div class="circle-card card highlight-close">
+        <div class="circle-card-header">
+          <div class="circle-badge-box close">
+            <span class="material-icons-round">favorite</span>
+          </div>
+          <div>
+            <h3>Cercle Proche</h3>
+            <span class="circle-subtitle">Amis intimes, voisins de palier & co-familles</span>
+          </div>
+        </div>
+
+        <p class="circle-desc">
+          Accès prioritaire aux dons d'objets, demandes de dépannage immédiat et alertes d'entraide express.
+        </p>
+
+        <div class="circle-members-list">
+          <div class="members-header">
+            <span>Membres ({{ getCircle('close')?.members?.length || 0 }})</span>
+            <button type="button" class="btn-text-action" (click)="openCircleModal('close')">
+              <span class="material-icons-round icon-sm">add</span> Ajouter
+            </button>
+          </div>
+
+          <div *ngIf="getCircle('close')?.members?.length" class="members-tags">
+            <span *ngFor="let member of getCircle('close')?.members" class="member-tag">
+              <span class="material-icons-round icon-sm">person</span>
+              {{ member }}
+              <button type="button" class="remove-btn" (click)="removeMemberFromCircle('close', member)" title="Retirer">
+                <span class="material-icons-round icon-sm">close</span>
+              </button>
+            </span>
+          </div>
+
+          <p *ngIf="!getCircle('close')?.members?.length" class="no-members-text">
+            Aucun membre dans ce cercle pour l'instant.
+          </p>
+        </div>
+      </div>
+
+      <!-- Neighborhood Circle -->
+      <div class="circle-card card highlight-neighborhood">
+        <div class="circle-card-header">
+          <div class="circle-badge-box neighborhood">
+            <span class="material-icons-round">home_work</span>
+          </div>
+          <div>
+            <h3>Cercle Quartier</h3>
+            <span class="circle-subtitle">Parents résidant dans le quartier Lafayette</span>
+          </div>
+        </div>
+
+        <p class="circle-desc">
+          Partage d'annonces de matériel volumineux (poussettes, parcs), covoiturage scolaire et sorties au parc.
+        </p>
+
+        <div class="circle-members-list">
+          <div class="members-header">
+            <span>Membres ({{ getCircle('neighborhood')?.members?.length || 0 }})</span>
+            <button type="button" class="btn-text-action" (click)="openCircleModal('neighborhood')">
+              <span class="material-icons-round icon-sm">add</span> Ajouter
+            </button>
+          </div>
+
+          <div *ngIf="getCircle('neighborhood')?.members?.length" class="members-tags">
+            <span *ngFor="let member of getCircle('neighborhood')?.members" class="member-tag">
+              <span class="material-icons-round icon-sm">person</span>
+              {{ member }}
+              <button type="button" class="remove-btn" (click)="removeMemberFromCircle('neighborhood', member)" title="Retirer">
+                <span class="material-icons-round icon-sm">close</span>
+              </button>
+            </span>
+          </div>
+
+          <p *ngIf="!getCircle('neighborhood')?.members?.length" class="no-members-text">
+            Aucun membre dans ce cercle pour l'instant.
+          </p>
+        </div>
+      </div>
+
+      <!-- All Parents Circle -->
+      <div class="circle-card card highlight-all">
+        <div class="circle-card-header">
+          <div class="circle-badge-box all">
+            <span class="material-icons-round">public</span>
+          </div>
+          <div>
+            <h3>Cercle Communauté</h3>
+            <span class="circle-subtitle">Tous les membres vérifiés de ParentConnect</span>
+          </div>
+        </div>
+
+        <p class="circle-desc">
+          Visibilité publique de vos annonces de vente et événements ouverts à toute l'agglomération.
+        </p>
+
+        <div class="circle-members-list">
+          <div class="members-header">
+            <span>Accès global</span>
+          </div>
+          <p class="all-note">
+            <span class="material-icons-round icon-sm">check</span>
+            Inclus automatiquement l'ensemble des parents avec profil conforme.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- TAB 4: VÉRIFICATION D'ADRESSE PAR LES PAIRS -->
+  <!-- ========================================================================= -->
+  <section *ngIf="activeTab === 'verification'" class="tab-content verification-section">
+
+    <div class="verification-hero card">
+      <div class="verif-status-badge" [class.verified]="currentLocation?.verified">
+        <span class="material-icons-round">
+          {{ currentLocation?.verified ? 'verified_user' : 'pending' }}
+        </span>
+      </div>
+
+      <div class="verif-hero-content">
+        <h2>Vérification d'Adresse par les Pairs</h2>
+        <p>
+          ParentConnect n'exige aucun justificatif bancaire ni facture intrusive. Notre système repose sur la
+          <strong>validation croisée de voisinage</strong> : 2 parents habitant déjà dans votre quartier confirment votre présence.
+        </p>
+
+        <div class="verif-progress-box">
+          <div class="progress-info">
+            <span>Statut de votre adresse :</span>
+            <strong [class.text-success]="currentLocation?.verified">
+              {{ currentLocation?.verified ? 'Vérifiée (2 / 2 confirmations reçues)' : 'En attente de confirmation' }}
+            </strong>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" [style.width]="currentLocation?.verified ? '100%' : '50%'"></div>
+          </div>
+        </div>
+
+        <div *ngIf="!currentLocation?.verified" class="verif-hero-actions">
+          <button type="button" class="btn btn-primary" (click)="requestAddressVerification()">
+            <span class="material-icons-round icon-sm">send</span>
+            Demander une validation à mes voisins
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incoming Validation Requests from Neighbors -->
+    <div class="neighbor-requests-section">
+      <div class="section-title-row">
+        <h3>Demandes de confirmation de vos voisins</h3>
+        <span class="badge-count">{{ pendingNeighborVerifications.length }} en attente</span>
+      </div>
+
+      <div class="neighbor-requests-grid">
+        <div *ngFor="let req of pendingNeighborVerifications" class="request-card card">
+          <div class="req-header">
+            <div class="req-avatar-placeholder">
+              {{ req.userName.substring(0, 2).toUpperCase() }}
+            </div>
+            <div class="req-info">
+              <h4>{{ req.userName }}</h4>
+              <span>Habitant du quartier {{ req.neighborhood }}</span>
+            </div>
+            <div class="req-count-badge">
+              {{ req.validationsReceived }} / {{ req.validationsRequired }} validation
+            </div>
+          </div>
+
+          <p class="req-text">
+            Ce parent sollicite votre confirmation pour attester qu'il réside bien dans le secteur Lafayette afin d'activer son badge de confiance.
+          </p>
+
+          <div class="req-actions">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              [disabled]="req.validationsReceived >= req.validationsRequired"
+              (click)="validateNeighbor(req)"
+            >
+              <span class="material-icons-round icon-sm">check</span>
+              {{ req.validationsReceived >= req.validationsRequired ? 'Confirmé' : 'Confirmer ce voisin' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: MISE À JOUR DE LA POSITION GÉOGRAPHIQUE -->
+<!-- ========================================================================= -->
+<div *ngIf="showLocationModal" class="modal-backdrop" (click)="closeLocationModal()">
+  <div class="modal-dialog card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <span class="material-icons-round modal-icon">pin_drop</span>
+        <h3>Définir ma position géographique</h3>
+      </div>
+      <button type="button" class="close-btn" (click)="closeLocationModal()">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="privacy-callout">
+        <span class="material-icons-round callout-icon">lock</span>
+        <p>
+          <strong>Floutage automatique (~200m) :</strong> vos coordonnées réelles sont hachées cryptographiquement (HMAC) sur le serveur.
+          Seule une position approchée à 200m sera visible par la communauté.
+        </p>
+      </div>
+
+      <div class="gps-quick-btn-box">
+        <button
+          type="button"
+          class="btn btn-outline w-100"
+          [disabled]="isGpsLoading"
+          (click)="useCurrentGps()"
+        >
+          <span class="material-icons-round icon-sm">my_location</span>
+          <span>{{ isGpsLoading ? 'Détection GPS en cours...' : 'Utiliser le GPS de mon appareil' }}</span>
+        </button>
+      </div>
+
+      <div class="preset-nh-box">
+        <label>Ou choisir un quartier prédéfini de Tunis :</label>
+        <div class="preset-chips">
+          <button
+            *ngFor="let nh of neighborhoods"
+            type="button"
+            class="preset-chip"
+            (click)="selectPresetNeighborhood(nh)"
+          >
+            {{ nh.name }}
+          </button>
+        </div>
+      </div>
+
+      <div class="coords-inputs-row">
+        <div class="input-field">
+          <label>Longitude (décimale)</label>
+          <input type="number" step="0.0001" class="form-input" [(ngModel)]="modalLng" />
+        </div>
+        <div class="input-field">
+          <label>Latitude (décimale)</label>
+          <input type="number" step="0.0001" class="form-input" [(ngModel)]="modalLat" />
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeLocationModal()">Annuler</button>
+      <button type="button" class="btn btn-primary" (click)="saveLocation()">
+        <span class="material-icons-round icon-sm">save</span>
+        Enregistrer avec floutage
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: AJOUTER UN MEMBRE À UN CERCLE -->
+<!-- ========================================================================= -->
+<div *ngIf="showCircleModal" class="modal-backdrop" (click)="closeCircleModal()">
+  <div class="modal-dialog card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <span class="material-icons-round modal-icon">person_add</span>
+        <h3>Ajouter un parent au Cercle {{ modalCircleLevel === 'close' ? 'Proche' : 'Quartier' }}</h3>
+      </div>
+      <button type="button" class="close-btn" (click)="closeCircleModal()">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <label>Identifiant ou pseudonyme du parent :</label>
+      <input
+        type="text"
+        class="form-input"
+        placeholder="ex : parent_karim ou parent_sarah"
+        [(ngModel)]="modalMemberInput"
+        (keyup.enter)="addMemberToCircle()"
+      />
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeCircleModal()">Annuler</button>
+      <button type="button" class="btn btn-primary" [disabled]="!modalMemberInput.trim()" (click)="addMemberToCircle()">
+        Ajouter au cercle
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: CALCUL DE PROXIMITÉ DIRECTE (HAVERSINE) -->
+<!-- ========================================================================= -->
+<div *ngIf="selectedParentForProximity" class="modal-backdrop" (click)="closeProximityModal()">
+  <div class="modal-dialog card" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title-row">
+        <span class="material-icons-round modal-icon">straighten</span>
+        <h3>Proximité avec {{ selectedParentForProximity.displayName }}</h3>
+      </div>
+      <button type="button" class="close-btn" (click)="closeProximityModal()">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+
+    <div class="modal-body text-center">
+      <div *ngIf="isCalculatingProximity" class="spinner-box">
+        <span class="material-icons-round spinning">refresh</span>
+        <p>Calcul de la distance entre positions floutées...</p>
+      </div>
+
+      <div *ngIf="!isCalculatingProximity && proximityCalculationResult" class="proximity-result-box">
+        <div class="distance-big-number">
+          {{ proximityCalculationResult.distance_m }} m
+        </div>
+        <p class="proximity-subtext">
+          Distance calculée par la formule Haversine entre vos deux centres de floutage HMAC (~200m de précision).
+        </p>
+        <span class="proximity-tip-pill">
+          <span class="material-icons-round icon-sm">directions_walk</span>
+          Environ {{ (proximityCalculationResult.distance_m / 80).toFixed(0) }} min à pied
+        </span>
+      </div>
+    </div>
+
+    <div class="modal-footer justify-content-center">
+      <button type="button" class="btn btn-primary" (click)="closeProximityModal()">Fermer</button>
+    </div>
+  </div>
+</div>

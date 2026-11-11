@@ -19,6 +19,7 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard',   loadComponent: () => import('./features/dashboard/dashboard.component').then(m => m.DashboardComponent) },
+      { path: 'neighborhood', loadChildren: () => import('./features/neighborhood/neighborhood.routes').then(m => m.NEIGHBORHOOD_ROUTES) },
       { path: 'marketplace', loadChildren: () => import('./features/marketplace/marketplace.routes').then(m => m.MARKETPLACE_ROUTES) },
       { path: 'babysitting', loadChildren: () => import('./features/babysitting/babysitting.routes').then(m => m.BABYSITTING_ROUTES) },
       { path: 'community',   loadChildren: () => import('./features/community/community.routes').then(m => m.COMMUNITY_ROUTES) },
@@ -31,6 +32,7 @@ export const routes: Routes = [
 
   // Friendly top-level aliases redirecting to protected /app/* routes
   { path: 'dashboard',   redirectTo: 'app/dashboard', pathMatch: 'full' },
+  { path: 'neighborhood', redirectTo: 'app/neighborhood', pathMatch: 'prefix' },
   { path: 'marketplace', redirectTo: 'app/marketplace', pathMatch: 'prefix' },
   { path: 'babysitting', redirectTo: 'app/babysitting', pathMatch: 'prefix' },
   { path: 'community',   redirectTo: 'app/community', pathMatch: 'prefix' },
