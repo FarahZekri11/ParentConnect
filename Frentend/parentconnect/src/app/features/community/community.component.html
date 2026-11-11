@@ -1,0 +1,333 @@
+<div class="community-page page-container">
+  <!-- Page Header -->
+  <header class="community-header">
+    <div class="header-content">
+      <div class="header-text">
+        <div class="header-badge">
+          <span class="material-icons-round icon-sm">diversity_1</span>
+          <span>Espace d'entraide entre parents</span>
+        </div>
+        <h1 class="page-title">Communauté ParentConnect</h1>
+        <p class="page-subtitle">
+          Posez vos questions, partagez vos astuces du quotidien et trouvez des conseils bienveillants auprès des familles de votre quartier.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <a routerLink="/app/community/new" class="btn btn-primary btn-compose">
+          <span class="material-icons-round">edit_note</span>
+          <span>Poser une question / Partager</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Search & Quick Filters Bar -->
+    <div class="filter-bar card">
+      <div class="search-input-wrapper">
+        <span class="material-icons-round search-icon">search</span>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Rechercher par mot-clé, sujet (#sommeil, #dme), auteur..."
+          [(ngModel)]="searchQuery"
+          (input)="onSearch()"
+        />
+        <button
+          *ngIf="searchQuery"
+          type="button"
+          class="btn-clear"
+          (click)="clearSearch()"
+          aria-label="Effacer la recherche"
+        >
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <!-- Type Filter Tabs -->
+      <div class="type-filter-group">
+        <button
+          *ngFor="let tf of typeFilters"
+          type="button"
+          class="type-tab-btn"
+          [class.active]="selectedType === tf.key"
+          (click)="selectType(tf.key)"
+        >
+          <span class="material-icons-round icon-sm">{{ tf.icon }}</span>
+          <span>{{ tf.label }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Category Chips Carousel / Row -->
+    <div class="category-chips-row">
+      <button
+        *ngFor="let cat of categories"
+        type="button"
+        class="chip"
+        [class.active]="selectedCategory === cat.key"
+        (click)="selectCategory(cat.key)"
+      >
+        <span class="material-icons-round icon-sm">{{ cat.icon }}</span>
+        <span>{{ cat.label }}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Grid: Feed + Right Sidebar -->
+  <div class="community-layout">
+    <!-- Center Feed Column -->
+    <main class="feed-column">
+      <!-- Composer Quick Trigger Card -->
+      <div class="composer-card card">
+        <div class="composer-top">
+          <div class="avatar avatar-md user-avatar">
+            <img
+              *ngIf="currentUser?.avatar; else userInitialFallback"
+              [src]="currentUser?.avatar"
+              [alt]="currentUser?.firstName"
+            />
+            <ng-template #userInitialFallback>
+              <span>{{ getUserInitials() }}</span>
+            </ng-template>
+          </div>
+          <a routerLink="/app/community/new" class="composer-prompt-btn">
+            Une question sur la DME, le sommeil ou la crèche ? Demandez à la communauté...
+          </a>
+        </div>
+
+        <div class="composer-actions">
+          <a routerLink="/app/community/new" [queryParams]="{ type: 'QUESTION' }" class="composer-action-btn">
+            <span class="material-icons-round text-question">help_outline</span>
+            <span>Poser une question</span>
+          </a>
+          <a routerLink="/app/community/new" [queryParams]="{ type: 'ADVICE' }" class="composer-action-btn">
+            <span class="material-icons-round text-advice">lightbulb</span>
+            <span>Donner une astuce</span>
+          </a>
+          <a routerLink="/app/community/new" [queryParams]="{ type: 'RECOMMENDATION' }" class="composer-action-btn">
+            <span class="material-icons-round text-rec">thumb_up</span>
+            <span>Recommander</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Feed Loading State -->
+      <div *ngIf="isLoading" class="loading-state">
+        <div class="card skeleton post-skeleton" *ngFor="let s of [1, 2, 3]"></div>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="!isLoading && posts.length === 0" class="empty-feed card">
+        <div class="empty-icon-bubble">
+          <span class="material-icons-round">forum</span>
+        </div>
+        <h3>Aucune publication trouvée</h3>
+        <p>
+          Il n'y a pas encore d'échanges correspondant à vos critères de recherche.
+        </p>
+        <div class="empty-actions">
+          <button type="button" class="btn btn-secondary" (click)="clearSearch(); selectCategory('ALL'); selectType('ALL')">
+            Réinitialiser les filtres
+          </button>
+          <a routerLink="/app/community/new" class="btn btn-primary">
+            Lancer la première discussion
+          </a>
+        </div>
+      </div>
+
+      <!-- Posts List -->
+      <div *ngIf="!isLoading && posts.length > 0" class="posts-list">
+        <article *ngFor="let post of posts" class="post-card card">
+          <!-- Card Header -->
+          <div class="post-card-header">
+            <div class="author-info">
+              <div class="avatar avatar-md">
+                <img
+                  *ngIf="post.authorAvatar; else avatarFallback"
+                  [src]="post.authorAvatar"
+                  [alt]="post.authorName"
+                />
+                <ng-template #avatarFallback>
+                  <span>{{ getInitials(post.authorName) }}</span>
+                </ng-template>
+              </div>
+              <div class="author-meta">
+                <span class="author-name">{{ post.authorName }}</span>
+                <span class="post-date">{{ post.createdAt | date:'d MMMM yyyy, HH:mm' }}</span>
+              </div>
+            </div>
+
+            <div class="post-badges">
+              <span class="post-type-badge" [ngClass]="getTypeBadgeClass(post.type)">
+                {{ getTypeLabel(post.type) }}
+              </span>
+              <span class="badge badge-primary">
+                {{ getCategoryLabel(post.category) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Card Body -->
+          <div class="post-card-body">
+            <h2 class="post-title">
+              <a [routerLink]="['/app/community', post.id]">{{ post.title }}</a>
+            </h2>
+            <p class="post-excerpt">{{ post.content }}</p>
+
+            <!-- Optional Image Preview -->
+            <div *ngIf="post.images && post.images.length > 0" class="post-image-preview">
+              <img [src]="post.images[0]" [alt]="post.title" loading="lazy" />
+            </div>
+
+            <!-- Tags -->
+            <div *ngIf="post.tags && post.tags.length > 0" class="post-tags-list">
+              <span
+                *ngFor="let tag of post.tags"
+                class="tag-pill"
+                (click)="selectTopic(tag)"
+              >
+                #{{ tag }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Card Footer Actions -->
+          <footer class="post-card-footer">
+            <div class="action-buttons-group">
+              <!-- Like button -->
+              <button
+                type="button"
+                class="post-action-btn like-btn"
+                [class.active]="post.isLiked"
+                (click)="toggleLike($event, post)"
+                [attr.aria-label]="post.isLiked ? 'Je n’aime plus' : 'J’aime'"
+              >
+                <span class="material-icons-round">
+                  {{ post.isLiked ? 'favorite' : 'favorite_border' }}
+                </span>
+                <span class="count">{{ post.likeCount }}</span>
+              </button>
+
+              <!-- Comment button -->
+              <a
+                [routerLink]="['/app/community', post.id]"
+                class="post-action-btn comment-btn"
+                aria-label="Commentaires"
+              >
+                <span class="material-icons-round">chat_bubble_outline</span>
+                <span class="count">{{ post.commentCount }}</span>
+              </a>
+
+              <!-- Save button -->
+              <button
+                type="button"
+                class="post-action-btn save-btn"
+                [class.active]="post.isSaved"
+                (click)="toggleSave($event, post)"
+                [title]="post.isSaved ? 'Enregistré dans les favoris' : 'Enregistrer'"
+              >
+                <span class="material-icons-round">
+                  {{ post.isSaved ? 'bookmark' : 'bookmark_border' }}
+                </span>
+              </button>
+
+              <!-- Share button -->
+              <button
+                type="button"
+                class="post-action-btn share-btn"
+                (click)="sharePost($event, post)"
+                title="Partager"
+              >
+                <span class="material-icons-round">share</span>
+              </button>
+            </div>
+
+            <!-- More / Report options -->
+            <div class="footer-meta-right">
+              <button
+                type="button"
+                class="btn-report"
+                (click)="reportPost($event, post)"
+                title="Signaler la publication"
+              >
+                <span class="material-icons-round icon-sm">flag</span>
+                <span>Signaler</span>
+              </button>
+            </div>
+          </footer>
+        </article>
+      </div>
+    </main>
+
+    <!-- Right Sidebar / Widgets -->
+    <aside class="sidebar-column">
+      <!-- Charter / Kindness Card -->
+      <div class="widget-card card kindness-card">
+        <div class="widget-header">
+          <span class="material-icons-round widget-icon icon-kindness">volunteer_activism</span>
+          <h3>Charte de bienveillance</h3>
+        </div>
+        <p class="widget-body">
+          ParentConnect est un cocon d'entraide respectueux. Ici, pas de jugement de valeur sur les choix d'éducation : chacun fait de son mieux !
+        </p>
+        <ul class="kindness-points">
+          <li>
+            <span class="material-icons-round icon-sm text-success">check_circle</span>
+            <span>Conseils éclairés & expériences vécues</span>
+          </li>
+          <li>
+            <span class="material-icons-round icon-sm text-success">check_circle</span>
+            <span>Écoute sans jugement parental</span>
+          </li>
+          <li>
+            <span class="material-icons-round icon-sm text-success">check_circle</span>
+            <span>Respect des avis pédiatriques officiels</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Trending Topics Widget -->
+      <div class="widget-card card">
+        <div class="widget-header">
+          <span class="material-icons-round widget-icon">trending_up</span>
+          <h3>Sujets tendance</h3>
+        </div>
+        <div class="trending-list">
+          <button
+            *ngFor="let topic of trendingTopics"
+            type="button"
+            class="trending-item"
+            (click)="selectTopic(topic.tag)"
+          >
+            <div class="trending-meta">
+              <span class="trending-tag">{{ topic.tag }}</span>
+              <span class="trending-desc">{{ topic.desc }}</span>
+            </div>
+            <span class="trending-badge">{{ topic.count }} msgs</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Community Guidelines Quick Links -->
+      <div class="widget-card card community-stats-card">
+        <div class="widget-header">
+          <span class="material-icons-round widget-icon">groups</span>
+          <h3>Entraide locale</h3>
+        </div>
+        <p class="stats-text">
+          Plus de <strong>1 280 parents</strong> actifs dans le quartier partagent des astuces au quotidien.
+        </p>
+        <div class="stats-row">
+          <div class="stat-box">
+            <span class="stat-number">98%</span>
+            <span class="stat-label">Réponses bienveillantes</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-number">&lt; 15 min</span>
+            <span class="stat-label">Délai moyen de réponse</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>

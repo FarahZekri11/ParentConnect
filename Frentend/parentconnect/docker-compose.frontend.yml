@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parentconnect_frontend
+    restart: unless-stopped
+    ports:
+      - '4200:80'
+    environment:
+      - API_GATEWAY_URL=http://localhost:8080
+    networks:
+      - parentconnect-network
+
+networks:
+  parentconnect-network:
+    external: true

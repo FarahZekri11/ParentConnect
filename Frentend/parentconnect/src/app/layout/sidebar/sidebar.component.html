@@ -1,0 +1,67 @@
+<nav class="sidebar" [class.open]="open" aria-label="Navigation principale">
+  <div class="sidebar-logo">
+    <a routerLink="/app/dashboard" class="logo-lockup" title="ParentConnect">
+      <span class="logo-badge-wrapper">
+        <img src="/logo2.png" alt="" class="sidebar-brand-logo" />
+      </span>
+      <span class="logo-text-col">
+        <span class="logo-text">ParentConnect</span>
+        <span class="logo-tagline">Le quartier des parents</span>
+      </span>
+    </a>
+  </div>
+
+  <div class="nav-section">
+    <p class="nav-label">Principal</p>
+    <a *ngFor="let item of mainNav"
+       [routerLink]="item.route"
+       routerLinkActive="active"
+       class="nav-item">
+      <span class="material-icons-round nav-icon" aria-hidden="true">{{item.icon}}</span>
+      <span class="nav-text">{{item.label}}</span>
+      <span *ngIf="item.badge" class="nav-badge">{{item.badge}}</span>
+    </a>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="nav-section">
+    <p class="nav-label">Mon espace</p>
+    <a *ngFor="let item of secondaryNav"
+       [routerLink]="item.route"
+       routerLinkActive="active"
+       class="nav-item">
+      <span class="material-icons-round nav-icon" aria-hidden="true">{{item.icon}}</span>
+      <span class="nav-text">{{item.label}}</span>
+    </a>
+  </div>
+
+  <div class="sidebar-note">
+    <span class="note-eyebrow">Cette semaine</span>
+    <p class="note-title">3 rendez-vous près de chez vous</p>
+    <a routerLink="/app/events" class="note-link">
+      Voir les événements
+      <span class="material-icons-round icon-xs" aria-hidden="true">arrow_forward</span>
+    </a>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="user-card-inner">
+      <div class="user-info">
+        <div class="user-avatar-wrap">
+          <div class="avatar avatar-sm user-avatar-styled">
+            {{getInitials()}}
+          </div>
+          <span class="online-indicator"></span>
+        </div>
+        <div class="user-details">
+          <p class="user-name">{{currentUser?.firstName}} {{currentUser?.lastName}}</p>
+          <p class="user-city">{{currentUser?.neighborhood || 'Paris 11e'}}</p>
+        </div>
+      </div>
+      <button type="button" class="logout-btn" (click)="logout()" title="Se déconnecter" aria-label="Se déconnecter">
+        <span class="material-icons-round" aria-hidden="true">logout</span>
+      </button>
+    </div>
+  </div>
+</nav>

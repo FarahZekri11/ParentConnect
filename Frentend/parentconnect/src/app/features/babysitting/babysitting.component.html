@@ -1,0 +1,255 @@
+<div class="babysitting-page">
+  <!-- Top Navigation & Tabs Header -->
+  <div class="header-section">
+    <div class="header-content">
+      <div class="header-titles">
+        <div class="badge-category">
+          <span class="material-icons-round icon-sm">child_care</span>
+          Entraide & Garde d'enfants
+        </div>
+        <h1>Baby-sitting de quartier</h1>
+        <p class="subtitle">Trouvez des baby-sitters de confiance, recommandés par les parents de votre communauté.</p>
+      </div>
+
+      <div class="header-actions">
+        <a routerLink="/app/babysitting/new-request" class="btn btn-primary btn-publish">
+          <span class="material-icons-round">add_circle_outline</span>
+          Publier une demande de garde
+        </a>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="navigation-tabs">
+      <button class="nav-tab active">
+        <span class="material-icons-round icon-sm">search</span>
+        Trouver un baby-sitter
+      </button>
+      <a routerLink="/app/babysitting/my-bookings" class="nav-tab">
+        <span class="material-icons-round icon-sm">calendar_month</span>
+        Mes réservations
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter Controls Section -->
+  <div class="filters-card card">
+    <div class="filters-grid">
+      <!-- Search Input -->
+      <div class="filter-item search-filter">
+        <label for="searchQuery">Recherche</label>
+        <div class="search-input-wrapper">
+          <span class="material-icons-round search-icon">search</span>
+          <input
+            type="text"
+            id="searchQuery"
+            class="form-control"
+            placeholder="Nom, compétences, mots-clés..."
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="onFilterChange()"
+          />
+          <button *ngIf="searchQuery" class="clear-btn" (click)="searchQuery = ''; onFilterChange()">
+            <span class="material-icons-round icon-sm">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Neighborhood Select -->
+      <div class="filter-item neighborhood-filter">
+        <label for="neighborhoodSelect">Quartier</label>
+        <div class="select-wrapper">
+          <select
+            id="neighborhoodSelect"
+            class="form-control"
+            [(ngModel)]="selectedNeighborhood"
+            (ngModelChange)="onFilterChange()"
+          >
+            <option value="ALL">Tous les quartiers</option>
+            <option *ngFor="let n of neighborhoods" [value]="n">{{ n }}</option>
+          </select>
+          <span class="material-icons-round select-arrow">expand_more</span>
+        </div>
+      </div>
+
+      <!-- Hourly Rate Range Slider -->
+      <div class="filter-item rate-filter">
+        <div class="rate-header">
+          <label for="rateSlider">Tarif max :</label>
+          <span class="rate-value">{{ maxHourlyRate }} €/h</span>
+        </div>
+        <div class="slider-wrapper">
+          <input
+            type="range"
+            id="rateSlider"
+            min="10"
+            max="25"
+            step="1"
+            class="range-slider"
+            [(ngModel)]="maxHourlyRate"
+            (ngModelChange)="onFilterChange()"
+          />
+          <div class="range-labels">
+            <span>10€</span>
+            <span>25€</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Availability Day Selector -->
+    <div class="day-filter-section">
+      <span class="day-filter-title">
+        <span class="material-icons-round icon-sm">event_available</span>
+        Disponibilité :
+      </span>
+      <div class="day-pills">
+        <button
+          *ngFor="let d of days"
+          type="button"
+          class="day-pill"
+          [class.active]="selectedDay === d.value"
+          (click)="selectDay(d.value)"
+        >
+          {{ d.label }}
+        </button>
+      </div>
+
+      <button
+        *ngIf="searchQuery || selectedNeighborhood !== 'ALL' || selectedDay !== null || maxHourlyRate !== 20"
+        class="btn-reset"
+        (click)="resetFilters()"
+      >
+        <span class="material-icons-round icon-sm">restart_alt</span>
+        Réinitialiser
+      </button>
+    </div>
+  </div>
+
+  <!-- Results Count Bar -->
+  <div class="results-header">
+    <div class="results-count">
+      <span class="count-number">{{ babysitters.length }}</span>
+      <span class="count-label">baby-sitter{{ babysitters.length > 1 ? 's' : '' }} disponible{{ babysitters.length > 1 ? 's' : '' }}</span>
+    </div>
+
+    <div class="security-guarantee">
+      <span class="material-icons-round icon-sm security-icon">verified_user</span>
+      <span>Profils vérifiés avec pièces d'identité & antécédents</span>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="grid-cards loading-grid">
+    <div class="card card-skeleton" *ngFor="let item of [1, 2, 3, 4]">
+      <div class="skeleton skeleton-header"></div>
+      <div class="skeleton skeleton-body"></div>
+      <div class="skeleton skeleton-footer"></div>
+    </div>
+  </div>
+
+  <!-- Babysitters Grid -->
+  <div *ngIf="!loading && babysitters.length > 0" class="grid-cards">
+    <div class="card card-hover babysitter-card" *ngFor="let b of babysitters">
+      <!-- Card Top: Avatar, Name, Verified, Price -->
+      <div class="card-top">
+        <div class="avatar-container">
+          <img
+            *ngIf="b.avatar"
+            [src]="b.avatar"
+            [alt]="b.firstName + ' ' + b.lastName"
+            class="avatar avatar-xl"
+            loading="lazy"
+          />
+          <div *ngIf="!b.avatar" class="avatar avatar-xl avatar-fallback">
+            {{ getInitials(b.firstName, b.lastName) }}
+          </div>
+          <span *ngIf="b.verified" class="verified-dot" title="Profil vérifié">
+            <span class="material-icons-round">check</span>
+          </span>
+        </div>
+
+        <div class="profile-meta">
+          <div class="name-row">
+            <h3 class="profile-name">{{ b.firstName }} {{ b.lastName }}</h3>
+            <span *ngIf="b.verified" class="badge-verified">
+              <span class="material-icons-round icon-sm">verified</span>
+              Vérifié
+            </span>
+          </div>
+
+          <div class="location-row">
+            <span class="material-icons-round icon-sm pin-icon">place</span>
+            <span class="location-text">{{ b.neighborhood }}, {{ b.city }}</span>
+          </div>
+
+          <div class="rating-row">
+            <div class="stars">
+              <span class="material-icons-round star-icon">star</span>
+              <span class="rating-val">{{ b.rating | number:'1.1-2' }}</span>
+            </div>
+            <span class="review-count">({{ b.reviewCount }} avis)</span>
+          </div>
+        </div>
+
+        <div class="price-pill">
+          <span class="price-val">{{ b.hourlyRate }}€</span>
+          <span class="price-unit">/ h</span>
+        </div>
+      </div>
+
+      <!-- Card Body: Bio snippet & Certifications -->
+      <div class="card-body">
+        <p class="bio-text">{{ b.bio }}</p>
+
+        <!-- Certifications & Skills Badges -->
+        <div class="cert-chips" *ngIf="b.certifications && b.certifications.length > 0">
+          <span class="chip-item" *ngFor="let cert of b.certifications | slice:0:2">
+            <span class="material-icons-round icon-sm cert-icon">check_circle</span>
+            {{ cert }}
+          </span>
+        </div>
+
+        <!-- Availabilities overview -->
+        <div class="availabilities-row" *ngIf="b.availabilities && b.availabilities.length > 0">
+          <span class="avail-title">Dispos :</span>
+          <div class="avail-days">
+            <span class="avail-tag" *ngFor="let a of b.availabilities">
+              {{ getDayName(a.dayOfWeek).slice(0, 3) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Footer: Actions -->
+      <div class="card-footer">
+        <a [routerLink]="['/app/babysitting', b.id]" class="btn btn-secondary btn-profile">
+          <span class="material-icons-round icon-sm">person</span>
+          Voir profil
+        </a>
+        <button type="button" class="btn btn-primary btn-book" (click)="bookBabysitter(b)">
+          <span class="material-icons-round icon-sm">calendar_month</span>
+          Réserver
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && babysitters.length === 0" class="empty-state card">
+    <div class="empty-icon-wrap">
+      <span class="material-icons-round empty-icon">person_search</span>
+    </div>
+    <h3>Aucun baby-sitter ne correspond à vos critères</h3>
+    <p>Essayez d'élargir votre recherche en sélectionnant un autre jour ou en augmentant le tarif maximum.</p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" (click)="resetFilters()">
+        <span class="material-icons-round icon-sm">restart_alt</span>
+        Réinitialiser les filtres
+      </button>
+      <a routerLink="/app/babysitting/new-request" class="btn btn-secondary">
+        <span class="material-icons-round icon-sm">campaign</span>
+        Publier une demande ouverte
+      </a>
+    </div>
+  </div>
+</div>

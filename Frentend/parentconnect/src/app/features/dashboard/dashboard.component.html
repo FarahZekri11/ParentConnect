@@ -1,0 +1,370 @@
+<div class="dashboard-wrapper">
+  <div class="dashboard-page animate-fadeIn">
+    <!-- ===================================================
+         1. HERO HEADER & FAMILY BAR
+         =================================================== -->
+    <header class="dashboard-hero">
+      <div class="hero-main">
+        <div class="hero-titles">
+          <div class="header-badge-row">
+            <div class="neighborhood-badge">
+              <span class="material-icons-round badge-icon" aria-hidden="true">location_on</span>
+              <span>{{ locationLabel }}</span>
+              <span class="live-dot" title="Activité en direct"></span>
+            </div>
+          </div>
+
+        <h1 class="welcome-heading">
+          {{ greetingTime }} <span class="user-highlight">{{ currentUser?.firstName || 'Farah' }}</span>
+          <span class="material-icons-round wave-icon" aria-hidden="true">waving_hand</span>
+        </h1>
+        <p class="welcome-subtitle">
+          Voici les annonces, activités et échanges de votre quartier aujourd'hui.
+        </p>
+      </div>
+
+      <!-- Family Summary Card / Pill -->
+      <div class="family-summary-card" *ngIf="family">
+        <div class="family-header">
+          <div class="family-label">
+            <span class="material-icons-round icon-sm text-accent">family_restroom</span>
+            <span class="family-title">{{ family.name || 'Ma Famille' }}</span>
+          </div>
+          <a routerLink="/app/family" class="family-link" title="Gérer le profil familial">
+            <span>Modifier</span>
+            <span class="material-icons-round icon-xs">chevron_right</span>
+          </a>
+        </div>
+
+        <div class="children-pills">
+          <div class="child-pill" *ngFor="let child of family.children">
+            <span class="child-avatar">
+              <span class="material-icons-round" aria-hidden="true">child_care</span>
+            </span>
+            <span class="child-name">{{ child.firstName }}</span>
+            <span class="child-age">({{ calculateAge(child.birthDate) }})</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 Quick Stats Row -->
+    <div class="stats-row">
+      <div class="stat-card" *ngFor="let stat of quickStats" [ngClass]="stat.colorClass">
+        <div class="stat-icon-wrapper">
+          <span class="material-icons-round stat-icon">{{ stat.icon }}</span>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stat.value }}</div>
+          <div class="stat-label">{{ stat.label }}</div>
+          <div class="stat-subtext">{{ stat.subtext }}</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================
+       2. QUICK ACTIONS ROW
+       =================================================== -->
+  <section class="section quick-actions-section" aria-label="Actions rapides">
+    <div class="quick-actions-grid">
+      <a
+        *ngFor="let action of quickActions"
+        [routerLink]="action.route"
+        class="quick-action-card"
+        [ngClass]="'theme-' + action.theme"
+      >
+        <div class="action-top">
+          <div class="action-icon-circle">
+            <span class="material-icons-round">{{ action.icon }}</span>
+          </div>
+          <span class="action-badge" *ngIf="action.badge">{{ action.badge }}</span>
+        </div>
+        <div class="action-body">
+          <h2 class="action-title">{{ action.title }}</h2>
+          <p class="action-desc">{{ action.description }}</p>
+        </div>
+        <div class="action-arrow">
+          <span class="material-icons-round">arrow_forward</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===================================================
+       3. BENTO GRID MAIN CONTENT
+       =================================================== -->
+  <div class="bento-container">
+    <!-- LEFT COLUMN: MARKETPLACE & COMMUNITY DISCUSSIONS -->
+    <div class="bento-column bento-column-main">
+
+      <!-- SECTION: NEARBY MARKETPLACE LISTINGS -->
+      <section class="bento-card marketplace-widget">
+        <div class="card-header">
+          <div class="header-titles">
+            <div class="title-with-icon">
+              <span class="header-icon-badge icon-badge-blue">
+                <span class="material-icons-round">storefront</span>
+              </span>
+              <div>
+                <h2 class="card-title">Objets & matériel près de vous</h2>
+                <p class="card-subtitle">Prêts, dons et bonnes affaires vérifiées du quartier</p>
+              </div>
+            </div>
+          </div>
+          <a routerLink="/app/marketplace" class="see-all-link">
+            <span>Explorer tout</span>
+            <span class="material-icons-round icon-sm">arrow_forward</span>
+          </a>
+        </div>
+
+        <!-- Listings Grid (4 Cards) -->
+        <div class="listings-grid">
+          <a
+            *ngFor="let item of nearbyListings"
+            [routerLink]="['/app/marketplace', item.id]"
+            class="listing-item-card"
+          >
+            <!-- Thumbnail Image -->
+            <div class="listing-thumb-container">
+              <img
+                [src]="item.images[0] || 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80'"
+                [alt]="item.title"
+                class="listing-image"
+                loading="lazy"
+              />
+              <span class="badge {{ getListingBadgeClass(item.type) }} listing-type-tag">
+                {{ getListingBadgeLabel(item.type) }}
+              </span>
+              <button
+                type="button"
+                class="fav-btn"
+                [class.favorited]="item.isFavorited"
+                (click)="toggleListingFavorite(item, $event)"
+                [attr.aria-label]="item.isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                [attr.aria-pressed]="item.isFavorited"
+                title="Ajouter aux favoris"
+              >
+                <span class="material-icons-round icon-sm" aria-hidden="true">
+                  {{ item.isFavorited ? 'favorite' : 'favorite_border' }}
+                </span>
+              </button>
+            </div>
+
+            <!-- Content -->
+            <div class="listing-details">
+              <div class="listing-pricing-row">
+                <span class="listing-price" *ngIf="item.type === 'SALE'; else freeTag">
+                  {{ item.price }} €
+                </span>
+                <ng-template #freeTag>
+                  <span class="listing-free">
+                    {{ item.type === 'DONATION' ? 'Don gratuit' : (item.type === 'LENDING' ? 'Prêt gracieux' : 'Troc') }}
+                  </span>
+                </ng-template>
+
+                <span class="listing-distance">
+                  <span class="material-icons-round icon-xs">near_me</span>
+                  {{ item.location.neighborhood || 'Quartier' }}
+                </span>
+              </div>
+
+              <h3 class="listing-title" [title]="item.title">{{ item.title }}</h3>
+
+              <div class="listing-footer">
+                <div class="owner-chip">
+                  <div class="owner-avatar">
+                    {{ getInitials(item.ownerName) }}
+                  </div>
+                  <span class="owner-name">{{ item.ownerName }}</span>
+                </div>
+                <span class="view-item-btn">
+                  <span class="material-icons-round icon-xs">visibility</span>
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </section>
+
+      <!-- SECTION: COMMUNITY DISCUSSIONS -->
+      <section class="bento-card community-widget">
+        <div class="card-header">
+          <div class="header-titles">
+            <div class="title-with-icon">
+              <span class="header-icon-badge icon-badge-purple">
+                <span class="material-icons-round">forum</span>
+              </span>
+              <div>
+                <h2 class="card-title">Discussions & entraide de quartier</h2>
+                <p class="card-subtitle">Conseils bienveillants et recommandations locales</p>
+              </div>
+            </div>
+          </div>
+          <a routerLink="/app/community" class="see-all-link">
+            <span>Rejoindre le forum</span>
+            <span class="material-icons-round icon-sm">arrow_forward</span>
+          </a>
+        </div>
+
+        <div class="community-list">
+          <a
+            *ngFor="let post of recentPosts"
+            [routerLink]="['/app/community', post.id]"
+            class="community-post-card"
+          >
+            <div class="post-header-line">
+              <div class="post-author-box">
+                <div class="post-author-avatar">
+                  {{ getInitials(post.authorName) }}
+                </div>
+                <div class="post-meta">
+                  <span class="post-author-name">{{ post.authorName }}</span>
+                  <span class="post-time">Récemment</span>
+                </div>
+              </div>
+              <span class="type-pill {{ getPostTypeBadgeClass(post.type) }}">
+                {{ getPostTypeLabel(post.type) }}
+              </span>
+            </div>
+
+            <h3 class="post-title">{{ post.title }}</h3>
+            <p class="post-snippet">{{ post.content }}</p>
+
+            <div class="post-footer">
+              <div class="post-tags-list">
+                <span class="post-tag">#{{ post.category.toLowerCase() }}</span>
+                <span class="post-tag">#paris11</span>
+              </div>
+              <div class="post-stats">
+                <span class="stat-pill">
+                  <span class="material-icons-round icon-xs">mode_comment</span>
+                  {{ post.commentCount }}
+                </span>
+                <span class="stat-pill" [class.active]="post.isLiked">
+                  <span class="material-icons-round icon-xs">favorite</span>
+                  {{ post.likeCount }}
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- RIGHT COLUMN: UPCOMING EVENTS & BABYSITTING SPOTLIGHT -->
+    <div class="bento-column bento-column-side">
+
+      <!-- SECTION: UPCOMING EVENTS -->
+      <section class="bento-card events-widget">
+        <div class="card-header">
+          <div class="header-titles">
+            <div class="title-with-icon">
+              <span class="header-icon-badge icon-badge-blush">
+                <span class="material-icons-round">event</span>
+              </span>
+              <div>
+                <h2 class="card-title">Événements à venir</h2>
+                <p class="card-subtitle">Rencontres et ateliers dans le 11e</p>
+              </div>
+            </div>
+          </div>
+          <a routerLink="/app/events" class="see-all-link">
+            <span>Tous</span>
+            <span class="material-icons-round icon-sm">arrow_forward</span>
+          </a>
+        </div>
+
+        <div class="events-list">
+          <div *ngFor="let evt of upcomingEvents" class="event-mini-card">
+            <!-- Date box -->
+            <div class="event-calendar-badge">
+              <span class="cal-day">{{ formatEventDate(evt.date).day }}</span>
+              <span class="cal-month">{{ formatEventDate(evt.date).month }}</span>
+            </div>
+
+            <!-- Content -->
+            <div class="event-info">
+              <div class="event-meta-top">
+                <span class="event-type-badge">{{ evt.isFree ? 'Gratuit' : (evt.price + ' €') }}</span>
+                <span class="event-time">
+                  <span class="material-icons-round icon-xs">schedule</span>
+                  {{ evt.startTime }}
+                </span>
+              </div>
+              <h3 class="event-title">
+                <a [routerLink]="['/app/events', evt.id]">{{ evt.title }}</a>
+              </h3>
+              <p class="event-location">
+                <span class="material-icons-round icon-xs">place</span>
+                {{ evt.address }}
+              </p>
+
+              <div class="event-action-row">
+                <span class="participants-badge">
+                  <span class="material-icons-round icon-xs">group</span>
+                  {{ evt.participantCount }} inscrits
+                </span>
+                <button
+                  type="button"
+                  class="btn-join"
+                  [class.joined]="evt.isJoined"
+                  [attr.aria-pressed]="evt.isJoined"
+                  (click)="toggleEventJoin(evt, $event)"
+                >
+                  <span class="material-icons-round icon-xs" aria-hidden="true">
+                    {{ evt.isJoined ? 'check' : 'add' }}
+                  </span>
+                  <span>{{ evt.isJoined ? 'Inscrit(e)' : 'Participer' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION: BABYSITTING SPOTLIGHT BANNER -->
+      <section class="bento-card babysitting-spotlight">
+        <div class="spotlight-deco-circle"></div>
+        <div class="spotlight-content">
+          <div class="spotlight-badge">
+            <span class="material-icons-round icon-xs">verified_user</span>
+            <span>Réseau de confiance</span>
+          </div>
+
+          <h2 class="spotlight-title">Besoin d’une garde ce week-end ?</h2>
+          <p class="spotlight-description">
+            Trouvez des baby-sitters recommandés par les parents de votre immeuble ou de votre école.
+          </p>
+
+          <div class="spotlight-metrics">
+            <div class="metric-item">
+              <span class="metric-num">100%</span>
+              <span class="metric-text">Profils vérifiés</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+              <span class="metric-num">4.9 ★</span>
+              <span class="metric-text">Avis voisins</span>
+            </div>
+            <div class="metric-divider"></div>
+            <div class="metric-item">
+              <span class="metric-num">12 €</span>
+              <span class="metric-text">Tarif moyen/h</span>
+            </div>
+          </div>
+
+          <div class="spotlight-cta">
+            <a routerLink="/app/babysitting" class="btn btn-spotlight">
+              <span class="material-icons-round icon-sm">search</span>
+              <span>Consulter les profils disponibles</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</div>

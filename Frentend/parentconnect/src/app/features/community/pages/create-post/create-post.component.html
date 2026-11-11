@@ -1,0 +1,163 @@
+<div class="create-post-page page-container">
+  <!-- Back Link -->
+  <nav class="navigation-back">
+    <a routerLink="/app/community" class="btn btn-ghost btn-sm">
+      <span class="material-icons-round">arrow_back</span>
+      <span>Retour à la communauté</span>
+    </a>
+  </nav>
+
+  <div class="create-post-wrapper card">
+    <header class="form-header">
+      <div class="icon-circle">
+        <span class="material-icons-round">campaign</span>
+      </div>
+      <div>
+        <h1 class="form-title">Créer une nouvelle publication</h1>
+        <p class="form-subtitle">
+          Partagez une question, une astuce ou une recommandation avec la communauté de parents.
+        </p>
+      </div>
+    </header>
+
+    <form [formGroup]="postForm" (ngSubmit)="onSubmit()" class="post-form">
+      <!-- 1. Post Type Selector -->
+      <section class="form-section">
+        <label class="section-label">1. Type de publication <span class="required">*</span></label>
+        <div class="type-selector-grid">
+          <button
+            *ngFor="let opt of typeOptions"
+            type="button"
+            class="type-select-card"
+            [class.selected]="postForm.get('type')?.value === opt.value"
+            (click)="selectType(opt.value)"
+          >
+            <div class="type-icon-wrapper">
+              <span class="material-icons-round">{{ opt.icon }}</span>
+            </div>
+            <div class="type-details">
+              <span class="type-name">{{ opt.label }}</span>
+              <span class="type-desc">{{ opt.desc }}</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Category Selector -->
+      <section class="form-section">
+        <label class="section-label">2. Thématique / Catégorie <span class="required">*</span></label>
+        <div class="category-pills-grid">
+          <button
+            *ngFor="let cat of categoryChoices"
+            type="button"
+            class="category-pill-btn"
+            [class.active]="postForm.get('category')?.value === cat.value"
+            (click)="selectCategory(cat.value)"
+          >
+            <span class="material-icons-round icon-sm">{{ cat.icon }}</span>
+            <span>{{ cat.label }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 3. Title -->
+      <div class="form-group">
+        <div class="label-with-hint">
+          <label for="post-title">3. Titre de votre échange <span class="required">*</span></label>
+          <span class="char-count" [class.danger]="(postForm.get('title')?.value?.length || 0) > 120">
+            {{ postForm.get('title')?.value?.length || 0 }} / 130
+          </span>
+        </div>
+        <input
+          id="post-title"
+          type="text"
+          class="form-control"
+          formControlName="title"
+          [placeholder]="samplePrompts[currentType]"
+          [class.has-error]="postForm.get('title')?.invalid && postForm.get('title')?.touched"
+        />
+        <div
+          *ngIf="postForm.get('title')?.invalid && postForm.get('title')?.touched"
+          class="form-error"
+        >
+          Un titre clair d'au moins 6 caractères est requis.
+        </div>
+      </div>
+
+      <!-- 4. Content -->
+      <div class="form-group">
+        <div class="label-with-hint">
+          <label for="post-content">4. Détail de votre message <span class="required">*</span></label>
+          <span class="char-count">
+            {{ postForm.get('content')?.value?.length || 0 }} caractères
+          </span>
+        </div>
+        <textarea
+          id="post-content"
+          rows="6"
+          class="form-control"
+          formControlName="content"
+          placeholder="Donnez du contexte (âge de l'enfant, ce que vous avez déjà essayé, vos questions précises...). Soyez le plus précis possible pour recevoir des réponses adaptées !"
+          [class.has-error]="postForm.get('content')?.invalid && postForm.get('content')?.touched"
+        ></textarea>
+        <div
+          *ngIf="postForm.get('content')?.invalid && postForm.get('content')?.touched"
+          class="form-error"
+        >
+          Le message doit comporter au moins 20 caractères.
+        </div>
+      </div>
+
+      <!-- 5. Tags & Optional Image -->
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="post-tags">Tags (mots-clés séparés par des virgules)</label>
+          <input
+            id="post-tags"
+            type="text"
+            class="form-control"
+            formControlName="tagsInput"
+            placeholder="Ex: dme, diversification, legumes, 6mois"
+          />
+          <span class="input-helper">Permet aux autres parents de retrouver facilement votre sujet.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="post-image">Lien d'une image (optionnel)</label>
+          <input
+            id="post-image"
+            type="url"
+            class="form-control"
+            formControlName="imageUrl"
+            placeholder="https://..."
+          />
+          <span class="input-helper">Une photo ou illustration pour étayer votre demande.</span>
+        </div>
+      </div>
+
+      <!-- Kindness Reminder -->
+      <div class="kindness-reminder-box">
+        <span class="material-icons-round reminder-icon">verified_user</span>
+        <div class="reminder-text">
+          <strong>Rappel bienveillant :</strong> Merci de respecter l'anonymat des enfants et de rester courtois. Les diagnostics médicaux doivent toujours être validés auprès d'un professionnel de santé.
+        </div>
+      </div>
+
+      <!-- Submit Actions -->
+      <div class="form-actions">
+        <a routerLink="/app/community" class="btn btn-secondary">
+          Annuler
+        </a>
+        <button
+          type="submit"
+          class="btn btn-primary btn-submit"
+          [disabled]="postForm.invalid || isSubmitting"
+        >
+          <span class="material-icons-round" *ngIf="!isSubmitting">send</span>
+          <span class="spinner" *ngIf="isSubmitting"></span>
+          <span>{{ isSubmitting ? 'Publication en cours...' : 'Publier dans la communauté' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

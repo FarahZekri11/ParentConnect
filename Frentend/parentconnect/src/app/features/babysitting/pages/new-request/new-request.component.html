@@ -1,0 +1,246 @@
+<div class="new-request-page">
+  <!-- Back Link -->
+  <div class="top-nav">
+    <a routerLink="/app/babysitting" class="back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour à la liste des baby-sitters
+    </a>
+  </div>
+
+  <div class="page-title-block">
+    <h1>Publier une demande de garde</h1>
+    <p class="subtitle">Précisez vos besoins pour trouver le baby-sitter idéal ou réserver directement.</p>
+  </div>
+
+  <!-- Targeted Babysitter Banner (if pre-selected) -->
+  <div *ngIf="selectedBabysitter" class="targeted-babysitter-card card">
+    <div class="bs-info">
+      <img
+        *ngIf="selectedBabysitter.avatar"
+        [src]="selectedBabysitter.avatar"
+        [alt]="selectedBabysitter.firstName"
+        class="avatar avatar-md"
+      />
+      <div>
+        <div class="bs-title">Demande envoyée directement à :</div>
+        <div class="bs-name">
+          {{ selectedBabysitter.firstName }} {{ selectedBabysitter.lastName }}
+          <span class="verified-badge">
+            <span class="material-icons-round icon-sm">verified</span>
+            Vérifié
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="bs-rate-info">
+      <span class="rate-badge">{{ selectedBabysitter.hourlyRate }} € / heure</span>
+      <button type="button" class="btn-clear-target" (click)="selectedBabysitter = null">
+        Changer
+      </button>
+    </div>
+  </div>
+
+  <!-- Form & Summary Grid -->
+  <div class="request-grid">
+    <!-- Form Card -->
+    <div class="form-container card">
+      <form [formGroup]="requestForm" (ngSubmit)="onSubmit()">
+        <!-- Date Selection -->
+        <div class="form-group">
+          <label for="reqDate">Date de la garde <span class="required">*</span></label>
+          <div class="input-icon-wrapper">
+            <span class="material-icons-round field-icon">calendar_today</span>
+            <input
+              type="date"
+              id="reqDate"
+              class="form-control"
+              formControlName="date"
+              [min]="minDate"
+              [class.has-error]="requestForm.get('date')?.invalid && requestForm.get('date')?.touched"
+            />
+          </div>
+          <span *ngIf="requestForm.get('date')?.invalid && requestForm.get('date')?.touched" class="form-error">
+            Veuillez indiquer une date valide.
+          </span>
+        </div>
+
+        <!-- Times: Start & End -->
+        <div class="grid-2 times-row">
+          <div class="form-group">
+            <label for="startTime">Heure de début <span class="required">*</span></label>
+            <div class="input-icon-wrapper">
+              <span class="material-icons-round field-icon">schedule</span>
+              <input
+                type="time"
+                id="startTime"
+                class="form-control"
+                formControlName="startTime"
+                [class.has-error]="requestForm.get('startTime')?.invalid && requestForm.get('startTime')?.touched"
+              />
+            </div>
+            <span *ngIf="requestForm.get('startTime')?.invalid && requestForm.get('startTime')?.touched" class="form-error">
+              Requis.
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="endTime">Heure de fin <span class="required">*</span></label>
+            <div class="input-icon-wrapper">
+              <span class="material-icons-round field-icon">schedule</span>
+              <input
+                type="time"
+                id="endTime"
+                class="form-control"
+                formControlName="endTime"
+                [class.has-error]="requestForm.get('endTime')?.invalid && requestForm.get('endTime')?.touched"
+              />
+            </div>
+            <span *ngIf="requestForm.get('endTime')?.invalid && requestForm.get('endTime')?.touched" class="form-error">
+              Requis.
+            </span>
+          </div>
+        </div>
+
+        <!-- Children Selection -->
+        <div class="form-group children-section">
+          <label>Enfants à garder <span class="required">*</span></label>
+
+          <!-- If family children exist: quick chips -->
+          <div *ngIf="familyChildren.length > 0" class="children-chips">
+            <button
+              type="button"
+              *ngFor="let child of familyChildren"
+              class="child-chip"
+              [class.selected]="isChildSelected(child.firstName)"
+              (click)="toggleChild(child.firstName)"
+            >
+              <span class="material-icons-round icon-sm">face</span>
+              {{ child.firstName }}
+            </button>
+          </div>
+
+          <!-- Fallback or additional count -->
+          <div class="children-count-control">
+            <span class="count-label">Nombre d'enfants :</span>
+            <input
+              type="number"
+              id="childrenCount"
+              min="1"
+              max="6"
+              class="form-control count-input"
+              formControlName="childrenCount"
+            />
+          </div>
+        </div>
+
+        <!-- Address -->
+        <div class="form-group">
+          <label for="address">Adresse du domicile <span class="required">*</span></label>
+          <div class="input-icon-wrapper">
+            <span class="material-icons-round field-icon">home</span>
+            <input
+              type="text"
+              id="address"
+              class="form-control"
+              placeholder="Ex: 14 Rue Oberkampf, 75011 Paris"
+              formControlName="address"
+              [class.has-error]="requestForm.get('address')?.invalid && requestForm.get('address')?.touched"
+            />
+          </div>
+          <span *ngIf="requestForm.get('address')?.invalid && requestForm.get('address')?.touched" class="form-error">
+            Veuillez indiquer une adresse complète.
+          </span>
+        </div>
+
+        <!-- Notes / Instructions -->
+        <div class="form-group">
+          <label for="notes">Consignes & détails spécifiques (optionnel)</label>
+          <textarea
+            id="notes"
+            rows="3"
+            class="form-control"
+            placeholder="Ex : Repas du soir déjà préparé, routine du coucher, devoirs de français, consignes d'allergies..."
+            formControlName="notes"
+          ></textarea>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary btn-submit"
+            [disabled]="submitting || requestForm.invalid"
+          >
+            <span *ngIf="submitting" class="spinner"></span>
+            <span *ngIf="!submitting" class="material-icons-round">send</span>
+            {{ submitting ? 'Envoi en cours...' : (selectedBabysitter ? 'Confirmer la réservation' : 'Diffuser ma demande') }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Summary & Cost Preview Column -->
+    <div class="summary-container">
+      <div class="card summary-card">
+        <h3>Récapitulatif de la garde</h3>
+
+        <div class="summary-rows">
+          <div class="summary-row">
+            <span class="row-label">Date :</span>
+            <span class="row-val">{{ requestForm.get('date')?.value | date:'EEEE d MMMM y' }}</span>
+          </div>
+
+          <div class="summary-row">
+            <span class="row-label">Horaires :</span>
+            <span class="row-val">
+              {{ requestForm.get('startTime')?.value }} - {{ requestForm.get('endTime')?.value }}
+            </span>
+          </div>
+
+          <div class="summary-row">
+            <span class="row-label">Durée estimée :</span>
+            <span class="row-val badge-duration">{{ durationHours }} heure{{ durationHours > 1 ? 's' : '' }}</span>
+          </div>
+
+          <div class="summary-row">
+            <span class="row-label">Enfant(s) :</span>
+            <span class="row-val">
+              {{ selectedChildrenNames.length > 0 ? selectedChildrenNames.join(', ') : (requestForm.get('childrenCount')?.value + ' enfant(s)') }}
+            </span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="summary-row rate-row">
+            <span class="row-label">Tarif appliqué :</span>
+            <span class="row-val">{{ selectedBabysitter ? selectedBabysitter.hourlyRate : 15 }} € / h</span>
+          </div>
+
+          <div class="total-row">
+            <div>
+              <span class="total-title">Total estimé</span>
+              <span class="total-subtitle">Règlement après prestation</span>
+            </div>
+            <div class="total-price">{{ estimatedCost }} €</div>
+          </div>
+        </div>
+
+        <!-- Trust Features -->
+        <div class="trust-features">
+          <div class="trust-item">
+            <span class="material-icons-round icon-sm trust-icon">verified_user</span>
+            <span>Profils 100% vérifiés par l'équipe ParentConnect</span>
+          </div>
+          <div class="trust-item">
+            <span class="material-icons-round icon-sm trust-icon">health_and_safety</span>
+            <span>Assurance responsabilité civile intégrée</span>
+          </div>
+          <div class="trust-item">
+            <span class="material-icons-round icon-sm trust-icon">cancel</span>
+            <span>Annulation gratuite jusqu'à 2h avant le début</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

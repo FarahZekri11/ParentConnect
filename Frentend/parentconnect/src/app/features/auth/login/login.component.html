@@ -1,0 +1,114 @@
+<div class="auth-page">
+  <aside class="auth-aside">
+    <video #authVideo
+           autoplay
+           [muted]="true"
+           muted="muted"
+           loop
+           playsinline
+           preload="auto"
+           class="auth-video-bg">
+      <source src="video.mp4" type="video/mp4">
+    </video>
+    <div class="auth-video-overlay"></div>
+
+    <div class="aside-top">
+      <a routerLink="/" class="aside-brand">
+        <img src="/logo2.png" alt="" class="aside-brand-logo" />
+        <span class="aside-brand-name">ParentConnect</span>
+      </a>
+    </div>
+
+    <div class="aside-copy">
+      <span class="aside-eyebrow">Le quartier des parents</span>
+      <blockquote>« On n'élève pas un enfant seul. On l'élève avec tout un quartier. »</blockquote>
+      <div class="aside-stats">
+        <div class="aside-stat">
+          <span class="aside-stat-value">2 400</span>
+          <span class="aside-stat-label">Parents</span>
+        </div>
+        <div class="aside-stat">
+          <span class="aside-stat-value">120</span>
+          <span class="aside-stat-label">Quartiers</span>
+        </div>
+        <div class="aside-stat">
+          <span class="aside-stat-value">850</span>
+          <span class="aside-stat-label">Annonces</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="aside-foot">
+      <span>Paris 11e · Oberkampf</span>
+      <span>Entraide locale</span>
+    </div>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-panel">
+      <a routerLink="/" class="back-link">
+        <span class="material-icons-round icon-sm" aria-hidden="true">arrow_back</span> Retour à l'accueil
+      </a>
+
+      <div class="auth-mobile-brand">
+        <img src="/logo2.png" alt="ParentConnect" />
+        <span>ParentConnect</span>
+      </div>
+
+      <div class="auth-head">
+        <span class="eyebrow">Connexion</span>
+        <h1>Bon retour.</h1>
+        <p>Retrouvez les familles, les objets et les rendez-vous de votre quartier.</p>
+      </div>
+
+      <div class="demo-hint">
+        <p class="demo-text"><strong>Compte de démonstration</strong><br />farah.zekri&#64;email.com · password123</p>
+        <button type="button" class="btn btn-secondary demo-fill" (click)="fillDemo()">Remplir</button>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
+        <div class="form-group">
+          <label for="email">Adresse email</label>
+          <div class="input-wrapper">
+            <span class="material-icons-round input-icon" aria-hidden="true">mail_outline</span>
+            <input id="email" type="email" formControlName="email" class="form-control with-icon"
+                   placeholder="votre@email.com" autocomplete="email"
+                   [attr.aria-invalid]="email?.invalid && email?.touched"
+                   [class.has-error]="email?.invalid && email?.touched" />
+          </div>
+          <span *ngIf="email?.invalid && email?.touched" class="form-error">Adresse email invalide.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Mot de passe</label>
+          <div class="input-wrapper">
+            <span class="material-icons-round input-icon" aria-hidden="true">lock_outline</span>
+            <input id="password" [type]="showPassword ? 'text' : 'password'" formControlName="password"
+                   class="form-control with-icon with-icon-right" placeholder="Votre mot de passe"
+                   autocomplete="current-password"
+                   [attr.aria-invalid]="password?.invalid && password?.touched"
+                   [class.has-error]="password?.invalid && password?.touched" />
+            <button type="button" class="input-icon-right" (click)="showPassword = !showPassword" [attr.aria-label]="showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'" [attr.aria-pressed]="showPassword">
+              <span class="material-icons-round icon-sm" aria-hidden="true">{{showPassword ? 'visibility_off' : 'visibility'}}</span>
+            </button>
+          </div>
+          <span *ngIf="password?.invalid && password?.touched" class="form-error">Mot de passe requis (min. 8 caractères).</span>
+        </div>
+
+        <div class="form-meta">
+          <a routerLink="/auth/forgot-password">Mot de passe oublié ?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full auth-submit" [disabled]="loading">
+          <span *ngIf="loading" class="spinner" aria-hidden="true"></span>
+          <span *ngIf="!loading">Se connecter</span>
+        </button>
+      </form>
+
+      <p class="auth-footer-text">
+        Pas encore de compte ?
+        <a routerLink="/auth/register">Créer un compte</a>
+      </p>
+    </div>
+  </main>
+</div>

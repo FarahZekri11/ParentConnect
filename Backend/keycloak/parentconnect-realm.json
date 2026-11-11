@@ -1,0 +1,116 @@
+{
+  "realm": "parentconnect",
+  "enabled": true,
+  "displayName": "ParentConnect Community Platform",
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "USER", "description": "ParentConnect standard user role" },
+      { "name": "ADMIN", "description": "ParentConnect administrator role" }
+    ],
+    "client": {
+      "marketplace-service": [
+        { "name": "MANAGE_LISTINGS", "description": "Manage community listings" },
+        { "name": "BORROW_ITEMS", "description": "Borrow equipment" }
+      ]
+    }
+  },
+  "groups": [],
+  "defaultRoles": ["USER", "offline_access", "uma_authorization"],
+  "clients": [
+    {
+      "clientId": "marketplace-service",
+      "name": "Marketplace Microservice Resource Server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false
+    },
+    {
+      "clientId": "api-gateway",
+      "name": "ParentConnect API Gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:8080/*", "http://localhost:4200/*"]
+    },
+    {
+      "clientId": "frontend-parentconnect",
+      "name": "Angular Frontend Application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost:4200/*"]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@parentconnect.com",
+      "firstName": "Admin",
+      "lastName": "ParentConnect",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER", "ADMIN"],
+      "clientRoles": {
+        "marketplace-service": ["MANAGE_LISTINGS", "BORROW_ITEMS"]
+      }
+    },
+    {
+      "username": "farah",
+      "enabled": true,
+      "email": "farah.zekri@email.com",
+      "firstName": "Farah",
+      "lastName": "Zekri",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER", "ADMIN"],
+      "clientRoles": {
+        "marketplace-service": ["MANAGE_LISTINGS", "BORROW_ITEMS"]
+      }
+    },
+    {
+      "username": "parent_test",
+      "enabled": true,
+      "email": "marie.l@email.com",
+      "firstName": "Marie",
+      "lastName": "Lambert",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER"],
+      "clientRoles": {
+        "marketplace-service": ["BORROW_ITEMS"]
+      }
+    }
+  ]
+}

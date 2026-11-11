@@ -1,0 +1,18 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: keycloak-security-service
+
+  # Keycloak Resource Server Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/parentconnect
+          jwk-set-uri: http://localhost:8180/realms/parentconnect/protocol/openid-connect/certs
+
+keycloak:
+  realm: parentconnect
+  resource: marketplace-service

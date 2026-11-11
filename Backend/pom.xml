@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.parentconnect</groupId>
+    <artifactId>parentconnect-backend</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>parentconnect-backend</name>
+    <description>ParentConnect - Spring Cloud Microservices Architecture Root Parent POM</description>
+
+    <modules>
+        <module>discovery-server</module>
+        <module>api-gateway</module>
+        <module>feign-client</module>
+        <module>rabbitmq-service</module>
+        <module>keycloak-security-service</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-boot.version>3.3.4</spring-boot.version>
+        <spring-cloud.version>2023.0.3</spring-cloud.version>
+    </properties>
+</project>

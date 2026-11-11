@@ -1,0 +1,106 @@
+<div class="favorites-page page-container">
+  <!-- Top Navigation & Header -->
+  <div class="top-nav-bar">
+    <a routerLink="/app/marketplace" class="btn btn-ghost btn-sm back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour à la Marketplace
+    </a>
+  </div>
+
+  <div class="page-header">
+    <div class="header-titles">
+      <div class="header-eyebrow">
+        <span class="material-icons-round icon-sm">favorite</span>
+        Vos coups de cœur
+      </div>
+      <h1>Mes annonces favorites</h1>
+      <p>Retrouvez rapidement tout le matériel sauvegardé pour vos enfants ou pour de futurs projets.</p>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="favorites-grid">
+    <div *ngFor="let s of [1,2,3,4]" class="card fav-skeleton-card">
+      <div class="skeleton thumb-skel"></div>
+      <div class="skeleton-body">
+        <div class="skeleton title-skel"></div>
+        <div class="skeleton line-skel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && favorites.length === 0" class="card empty-state-box">
+    <div class="empty-icon-wrap">
+      <span class="material-icons-round icon-xl">favorite_border</span>
+    </div>
+    <h3>Aucun favori pour le moment</h3>
+    <p>
+      Vous n'avez pas encore enregistré d'annonces. Cliquez sur le cœur d'une annonce pour la retrouver ici facilement !
+    </p>
+    <a routerLink="/app/marketplace" class="btn btn-primary">
+      <span class="material-icons-round icon-sm">search</span>
+      Explorer la marketplace
+    </a>
+  </div>
+
+  <!-- Favorites Grid -->
+  <div *ngIf="!isLoading && favorites.length > 0" class="favorites-grid">
+    <article
+      *ngFor="let item of favorites"
+      class="card favorite-card card-hover"
+      [routerLink]="['/app/marketplace', item.id]"
+    >
+      <div class="fav-thumb-wrap">
+        <img
+          [src]="item.images && item.images.length ? item.images[0] : 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80'"
+          [alt]="item.title"
+          (error)="onImageError($event)"
+        />
+
+        <span class="badge type-badge" [ngClass]="getTypeBadgeClass(item.type)">
+          {{ getTypeLabel(item.type) }}
+        </span>
+
+        <span class="badge badge-neutral cond-badge">
+          {{ getConditionLabel(item.condition) }}
+        </span>
+
+        <!-- Remove favorite button -->
+        <button
+          type="button"
+          class="remove-fav-btn"
+          (click)="removeFavorite($event, item)"
+          title="Retirer des favoris"
+        >
+          <span class="material-icons-round icon-md">favorite</span>
+        </button>
+      </div>
+
+      <div class="card-body">
+        <div class="price-row">
+          <span class="cat-label">{{ item.category }}</span>
+          <span class="price-val" [ngClass]="getTypeBadgeClass(item.type)">{{ getPriceDisplay(item) }}</span>
+        </div>
+
+        <h3 class="card-title">{{ item.title }}</h3>
+        <p class="card-desc">{{ item.description }}</p>
+
+        <div class="card-footer">
+          <div class="owner-pill">
+            <div class="avatar avatar-sm">
+              <img *ngIf="item.ownerAvatar" [src]="item.ownerAvatar" [alt]="item.ownerName" />
+              <span *ngIf="!item.ownerAvatar">{{ getInitials(item.ownerName) }}</span>
+            </div>
+            <span class="owner-name">{{ item.ownerName }}</span>
+          </div>
+
+          <span class="location-tag">
+            <span class="material-icons-round icon-xs">place</span>
+            {{ item.location.city || 'Paris' }}
+          </span>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>

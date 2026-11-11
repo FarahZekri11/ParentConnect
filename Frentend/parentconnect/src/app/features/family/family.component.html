@@ -1,0 +1,283 @@
+<div class="family-page page-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <div class="badge badge-accent mb-2">Espace Familial</div>
+      <h1>Mon Foyer &amp; Enfants</h1>
+      <p>Gérez le profil de votre famille, vos enfants et leurs besoins spécifiques (allergies, notes).</p>
+    </div>
+  </header>
+
+  <!-- Family Overview Layout -->
+  <div class="family-layout">
+    <div class="main-column">
+      
+      <!-- Family Name Card -->
+      <section class="family-name-card card">
+        <div class="family-card-body">
+          <div class="family-crest">
+            <span class="material-icons-round">home</span>
+          </div>
+          <div class="family-details">
+            <h2 class="family-title">{{ family?.name || 'Famille Zekri' }}</h2>
+            <p class="family-meta">
+              <span class="material-icons-round icon-sm">people</span>
+              <span>{{ family?.children?.length || 0 }} {{ (family?.children?.length || 0) > 1 ? 'enfants enregistrés' : 'enfant enregistré' }}</span>
+              <span class="separator">•</span>
+              <span class="material-icons-round icon-sm">place</span>
+              <span>Paris 11ème</span>
+            </p>
+          </div>
+          <button class="btn btn-primary add-child-header-btn" (click)="openAddChildModal()" type="button">
+            <span class="material-icons-round">add</span>
+            <span>Ajouter un enfant</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Children Section -->
+      <section class="children-section">
+        <div class="section-title">
+          <h3>Les enfants de la famille</h3>
+          <button class="btn btn-secondary btn-sm" (click)="openAddChildModal()" type="button">
+            <span class="material-icons-round">add_circle_outline</span>
+            <span>Ajouter un enfant</span>
+          </button>
+        </div>
+
+        <div *ngIf="loading" class="grid-2">
+          <div class="skeleton child-skeleton" *ngFor="let i of [1, 2]"></div>
+        </div>
+
+        <div *ngIf="!loading && (!family?.children || family?.children?.length === 0)" class="empty-children card">
+          <div class="empty-icon">
+            <span class="material-icons-round">child_care</span>
+          </div>
+          <h3>Aucun enfant renseigné</h3>
+          <p>Ajoutez le profil de vos enfants pour faciliter la recherche de babysitters et trouver du matériel adapté.</p>
+          <button class="btn btn-primary" (click)="openAddChildModal()" type="button">
+            <span class="material-icons-round">add</span>
+            <span>Ajouter mon premier enfant</span>
+          </button>
+        </div>
+
+        <div *ngIf="!loading && family?.children && (family?.children?.length || 0) > 0" class="children-grid grid-2">
+          <article class="child-card card card-hover" *ngFor="let child of family?.children">
+            <!-- Child Header -->
+            <div class="child-card-header">
+              <div
+                class="child-avatar"
+                [style.background]="getChildAvatarBackground(child.gender)"
+              >
+                <img *ngIf="child.avatar" [src]="child.avatar" [alt]="child.firstName" />
+                <span *ngIf="!child.avatar" class="material-icons-round">
+                  {{ getChildIcon(child.gender) }}
+                </span>
+              </div>
+
+              <div class="child-info">
+                <div class="child-name-row">
+                  <h4 class="child-name">{{ child.firstName }}</h4>
+                  <span class="child-gender-badge" [class.girl]="child.gender === 'F'" [class.boy]="child.gender === 'M'">
+                    {{ child.gender === 'F' ? 'Fille' : child.gender === 'M' ? 'Garçon' : 'Enfant' }}
+                  </span>
+                </div>
+                <div class="child-age-pill">
+                  <span class="material-icons-round icon-sm">cake</span>
+                  <span>{{ calculateAge(child.birthDate) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Child Details / Body -->
+            <div class="child-card-body">
+              <!-- Allergies -->
+              <div class="info-block">
+                <span class="info-label">Allergies &amp; Régime</span>
+                <div class="allergies-container">
+                  <span *ngIf="child.allergies" class="badge badge-warning">
+                    <span class="material-icons-round icon-sm">warning_amber</span>
+                    {{ child.allergies }}
+                  </span>
+                  <span *ngIf="!child.allergies" class="badge badge-success">
+                    <span class="material-icons-round icon-sm">check_circle</span>
+                    Aucune allergie connue
+                  </span>
+                </div>
+              </div>
+
+              <!-- Notes -->
+              <div class="info-block" *ngIf="child.notes">
+                <span class="info-label">Remarques &amp; Habitudes</span>
+                <p class="notes-text">{{ child.notes }}</p>
+              </div>
+
+              <div class="info-block" *ngIf="!child.notes">
+                <span class="info-label">Remarques</span>
+                <p class="notes-text empty-notes">Aucune note particulière ajoutée.</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- SIDEBAR: Tips for family profile -->
+    <aside class="tips-sidebar">
+      <div class="tips-card card">
+        <div class="tips-header">
+          <span class="material-icons-round tips-icon">lightbulb</span>
+          <h4>Conseils pour votre profil famille</h4>
+        </div>
+        <ul class="tips-list">
+          <li class="tip-item">
+            <span class="material-icons-round tip-check">check_circle</span>
+            <div>
+              <strong>Précisez les allergies :</strong>
+              <p>Indispensable pour vos réservations de babysitting et repas partagés en atelier.</p>
+            </div>
+          </li>
+          <li class="tip-item">
+            <span class="material-icons-round tip-check">check_circle</span>
+            <div>
+              <strong>Date de naissance à jour :</strong>
+              <p>Permet à la communauté de vous suggérer des vêtements et jouets parfaitement calibrés pour leur âge.</p>
+            </div>
+          </li>
+          <li class="tip-item">
+            <span class="material-icons-round tip-check">check_circle</span>
+            <div>
+              <strong>Notes et centres d'intérêt :</strong>
+              <p>Facilite la prise de contact lors des sorties au parc (Playdates) entre petits copains du quartier.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Quick stats / Safety badge card -->
+      <div class="safety-card card">
+        <div class="safety-badge">
+          <span class="material-icons-round">verified_user</span>
+        </div>
+        <h4>Données privées protégées</h4>
+        <p>Les informations de vos enfants ne sont partagées qu'avec les parents et gardes d'enfants que vous validez explicitement.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- INLINE MODAL: Ajouter un enfant -->
+  <div class="modal-backdrop" *ngIf="showAddChildModal" (click)="closeAddChildModal()">
+    <div class="modal-card card animate-scaleIn" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrapper">
+          <div class="modal-icon-badge">
+            <span class="material-icons-round">child_care</span>
+          </div>
+          <div>
+            <h3>Ajouter un enfant</h3>
+            <p class="modal-sub">Renseignez les détails pour votre foyer</p>
+          </div>
+        </div>
+        <button class="modal-close-btn" (click)="closeAddChildModal()" type="button" aria-label="Fermer">
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <form [formGroup]="childForm" (ngSubmit)="submitAddChild()" class="modal-form">
+        <!-- First Name -->
+        <div class="form-group">
+          <label for="firstName">Prénom <span class="required">*</span></label>
+          <input
+            id="firstName"
+            type="text"
+            class="form-control"
+            placeholder="Ex : Lucas, Camille..."
+            formControlName="firstName"
+            [class.has-error]="childForm.get('firstName')?.invalid && childForm.get('firstName')?.touched"
+          />
+          <span
+            class="form-error"
+            *ngIf="childForm.get('firstName')?.invalid && childForm.get('firstName')?.touched"
+          >
+            Le prénom est requis (au moins 2 caractères).
+          </span>
+        </div>
+
+        <!-- Row: Birth Date & Gender -->
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="birthDate">Date de naissance <span class="required">*</span></label>
+            <input
+              id="birthDate"
+              type="date"
+              class="form-control"
+              formControlName="birthDate"
+              [class.has-error]="childForm.get('birthDate')?.invalid && childForm.get('birthDate')?.touched"
+            />
+            <span
+              class="form-error"
+              *ngIf="childForm.get('birthDate')?.invalid && childForm.get('birthDate')?.touched"
+            >
+              La date de naissance est obligatoire.
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="gender">Genre</label>
+            <select id="gender" class="form-control" formControlName="gender">
+              <option value="F">Fille</option>
+              <option value="M">Garçon</option>
+              <option value="OTHER">Autre</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Allergies -->
+        <div class="form-group">
+          <label for="allergies">Allergies ou intolérances (optionnel)</label>
+          <input
+            id="allergies"
+            type="text"
+            class="form-control"
+            placeholder="Ex : Arachides, lactose, pollen, asthme..."
+            formControlName="allergies"
+          />
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group">
+          <label for="notes">Notes, habitudes ou passions (optionnel)</label>
+          <textarea
+            id="notes"
+            rows="3"
+            class="form-control"
+            placeholder="Ex : Adore les histoires avant la sieste, aime dessiner..."
+            formControlName="notes"
+          ></textarea>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="modal-footer">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="closeAddChildModal()"
+            [disabled]="isSubmitting"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="childForm.invalid || isSubmitting"
+          >
+            <span class="material-icons-round" *ngIf="!isSubmitting">add</span>
+            <span class="material-icons-round spin" *ngIf="isSubmitting">sync</span>
+            <span>{{ isSubmitting ? 'Ajout en cours...' : 'Ajouter l’enfant' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,125 @@
+services:
+  # ----------------------------------------------------
+  # 1. Service Discovery — Spring Cloud Eureka (Port 8761)
+  # ----------------------------------------------------
+  discovery-server:
+    build:
+      context: ./Backend/discovery-server
+    container_name: parentconnect_discovery_server
+    restart: always
+    ports:
+      - '8761:8761'
+    networks:
+      - parentconnect-network
+
+  # ----------------------------------------------------
+  # 2. Identity & Access Management — Keycloak (Port 8180)
+  # ----------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: parentconnect_keycloak
+    restart: always
+    command: start-dev --http-port=8180 --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HEALTH_ENABLED=true
+      - KC_METRICS_ENABLED=true
+    ports:
+      - '8180:8180'
+    volumes:
+      - ./Backend/keycloak/parentconnect-realm.json:/opt/keycloak/data/import/parentconnect-realm.json:ro
+    networks:
+      - parentconnect-network
+
+  # ----------------------------------------------------
+  # 3. Message Broker — RabbitMQ with Management UI (Port 5672 / 15672)
+  # ----------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: parentconnect_rabbitmq
+    restart: always
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - parentconnect-network
+
+  # ----------------------------------------------------
+  # 4. Database — MongoDB for Marketplace Microservice
+  # ----------------------------------------------------
+  marketplace-mongodb:
+    image: mongo:7.0
+    container_name: parentconnect_marketplace_db
+    restart: always
+    ports:
+      - '27017:27017'
+    volumes:
+      - marketplace_mongo_data:/data/db
+    networks:
+      - parentconnect-network
+
+  # ----------------------------------------------------
+  # 5. Core Microservice — Marketplace Service (Port 3002)
+  # ----------------------------------------------------
+  marketplace-service:
+    build:
+      context: ./Backend/marketplace-service
+      dockerfile: Dockerfile
+    container_name: parentconnect_marketplace_service
+    restart: always
+    ports:
+      - '3002:3002'
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://marketplace-mongodb:27017/parentconnect_marketplace
+      - JWT_SECRET=parentconnect_jwt_secret_key
+      - KEYCLOAK_URL=http://keycloak:8180
+      - KEYCLOAK_REALM=parentconnect
+      - KEYCLOAK_CLIENT_ID=marketplace-service
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+      - EUREKA_HOST=discovery-server
+      - EUREKA_PORT=8761
+      - APP_NAME=MARKETPLACE-SERVICE
+    depends_on:
+      - marketplace-mongodb
+      - discovery-server
+      - keycloak
+      - rabbitmq
+    networks:
+      - parentconnect-network
+
+  # ----------------------------------------------------
+  # 6. Ingress Entry Point — Spring Cloud API Gateway (Port 8080)
+  # ----------------------------------------------------
+  api-gateway:
+    build:
+      context: ./Backend/api-gateway
+    container_name: parentconnect_api_gateway
+    restart: always
+    ports:
+      - '8080:8080'
+    environment:
+      - PORT=8080
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8180/realms/parentconnect
+    depends_on:
+      - discovery-server
+      - marketplace-service
+      - keycloak
+    networks:
+      - parentconnect-network
+
+volumes:
+  marketplace_mongo_data:
+  rabbitmq_data:
+
+networks:
+  parentconnect-network:
+    driver: bridge

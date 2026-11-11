@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  # Keycloak OAuth2 Resource Server Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://keycloak:8180/realms/parentconnect/protocol/openid-connect/certs
+
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: false
+      routes:
+        # Route 1: Marketplace Service (Routed to registered Eureka service)
+        - id: marketplace-service
+          uri: lb://MARKETPLACE-SERVICE
+          predicates:
+            - Path=/api/listings/**, /api/health
+
+        # Route 2: Eureka Discovery Server Web Dashboard
+        - id: eureka-dashboard
+          uri: http://discovery-server:8761
+          predicates:
+            - Path=/eureka/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,routes

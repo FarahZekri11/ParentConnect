@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Dedicated MongoDB instance for standalone local testing
+  marketplace-mongodb:
+    image: mongo:7.0
+    container_name: marketplace_local_db
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - marketplace_local_mongo_data:/data/db
+    networks:
+      - marketplace-local-net
+
+  # Marketplace microservice running standalone
+  marketplace-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: marketplace_local_service
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    environment:
+      - PORT=8080
+      - APP_PORT=8080
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://marketplace-mongodb:27017/parentconnect_marketplace
+      - JWT_SECRET=parentconnect_local_secret_key
+      # Optional external services (disabled or local defaults)
+      - KEYCLOAK_URL=http://localhost:8180
+      - KEYCLOAK_REALM=parentconnect
+    depends_on:
+      - marketplace-mongodb
+    networks:
+      - marketplace-local-net
+
+volumes:
+  marketplace_local_mongo_data:
+
+networks:
+  marketplace-local-net:
+    driver: bridge

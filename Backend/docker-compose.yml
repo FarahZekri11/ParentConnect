@@ -1,0 +1,187 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Service Discovery — Spring Cloud Eureka Server (Port 8761)
+  # ---------------------------------------------------------------------------
+  discovery-server:
+    build:
+      context: ./discovery-server
+    container_name: parentconnect_discovery_server
+    restart: unless-stopped
+    ports:
+      - '8761:8761'
+    environment:
+      - PORT=8761
+      - SPRING_PROFILES_ACTIVE=prod
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 2. Identity & Access Management — Keycloak IAM (Port 8180)
+  # ---------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: parentconnect_keycloak
+    restart: unless-stopped
+    command: start-dev --http-port=8180 --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - KC_HEALTH_ENABLED=true
+      - KC_METRICS_ENABLED=true
+    ports:
+      - '8180:8180'
+    volumes:
+      - ./keycloak/parentconnect-realm.json:/opt/keycloak/data/import/parentconnect-realm.json:ro
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 3. Asynchronous Message Broker — RabbitMQ 3.13 (AMQP 5672 / Web UI 15672)
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: parentconnect_rabbitmq
+    restart: unless-stopped
+    ports:
+      - '5672:5672'     # AMQP Protocol
+      - '15672:15672'   # Web Management Console
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 4. Database — MongoDB for Marketplace Microservice (Port 27017)
+  # ---------------------------------------------------------------------------
+  marketplace-mongodb:
+    image: mongo:7.0
+    container_name: parentconnect_marketplace_db
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - marketplace_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 5. Core Microservice — Marketplace Service (NestJS, Port 3002)
+  # ---------------------------------------------------------------------------
+  marketplace-service:
+    build:
+      context: ./marketplace-service
+      dockerfile: Dockerfile
+    container_name: parentconnect_marketplace_service
+    restart: unless-stopped
+    ports:
+      - '3002:3002'
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://marketplace-mongodb:27017/parentconnect_marketplace
+      - JWT_SECRET=${JWT_SECRET:-parentconnect_jwt_secret_key}
+      - KEYCLOAK_URL=http://keycloak:8180
+      - KEYCLOAK_REALM=parentconnect
+      - KEYCLOAK_CLIENT_ID=marketplace-service
+      - RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+      - EUREKA_HOST=discovery-server
+      - EUREKA_PORT=8761
+      - APP_NAME=MARKETPLACE-SERVICE
+    depends_on:
+      marketplace-mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
+      keycloak:
+        condition: service_started
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 6. Central Gateway — Spring Cloud API Gateway (Port 8080)
+  # ---------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: parentconnect_api_gateway
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    environment:
+      - PORT=8080
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      - SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI=http://keycloak:8180/realms/parentconnect
+    depends_on:
+      - discovery-server
+      - marketplace-service
+      - keycloak
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 7. Inter-Service Client — Spring Cloud OpenFeign Reference (Port 8082)
+  # ---------------------------------------------------------------------------
+  feign-client-service:
+    build:
+      context: ./feign-client
+    container_name: parentconnect_feign_service
+    restart: unless-stopped
+    ports:
+      - '8082:8082'
+    environment:
+      - MARKETPLACE_SERVICE_URL=http://marketplace-service:3002
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-server:8761/eureka/
+    depends_on:
+      - discovery-server
+      - marketplace-service
+    networks:
+      - parentconnect-network
+
+  # ---------------------------------------------------------------------------
+  # 8. Event Listener — Spring Boot RabbitMQ Consumer (Port 8083)
+  # ---------------------------------------------------------------------------
+  rabbitmq-service:
+    build:
+      context: ./rabbitmq-service
+    container_name: parentconnect_rabbitmq_service
+    restart: unless-stopped
+    ports:
+      - '8083:8083'
+    environment:
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER:-guest}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASS:-guest}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - parentconnect-network
+
+volumes:
+  marketplace_mongo_data:
+    name: parentconnect_marketplace_mongo_data
+  rabbitmq_data:
+    name: parentconnect_rabbitmq_data
+
+networks:
+  parentconnect-network:
+    name: parentconnect-network
+    driver: bridge

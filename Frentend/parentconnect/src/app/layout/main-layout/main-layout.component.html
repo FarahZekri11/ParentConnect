@@ -1,0 +1,34 @@
+<div class="layout" [class.sidebar-collapsed]="isMobile() && !sidebarOpen()">
+  <!-- Dynamic Background Slideshow across ALL /app pages -->
+  <div class="layout-bg-slider" aria-hidden="true">
+    <div
+      *ngFor="let photo of bgService.photos; let i = index"
+      class="bg-slide"
+      [class.active]="bgService.activePhotoIndex() === i"
+      [style.background-image]="'url(' + photo + ')'"
+    ></div>
+    <div class="layout-bg-overlay"></div>
+  </div>
+
+  <app-sidebar
+    [open]="!isMobile() || sidebarOpen()"
+    [attr.inert]="isMobile() && !sidebarOpen() ? '' : null"
+    [attr.aria-hidden]="isMobile() && !sidebarOpen()"
+  />
+
+  <div
+    class="sidebar-scrim"
+    *ngIf="isMobile() && sidebarOpen()"
+    (click)="closeSidebar()"
+    aria-hidden="true"
+  ></div>
+
+  <div class="layout-body">
+    <app-header (menuToggled)="toggleSidebar()" />
+    <main class="layout-content">
+      <router-outlet />
+    </main>
+  </div>
+
+  <app-mobile-nav *ngIf="isMobile()" />
+</div>

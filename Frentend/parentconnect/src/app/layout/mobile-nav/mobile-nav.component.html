@@ -1,0 +1,9 @@
+<nav class="mobile-nav" aria-label="Navigation principale">
+  <a *ngFor="let item of navItems"
+     [routerLink]="item.route"
+     routerLinkActive="active"
+     class="mobile-nav-item">
+    <span class="material-icons-round" aria-hidden="true">{{item.icon}}</span>
+    <span class="mobile-nav-label">{{item.label}}</span>
+  </a>
+</nav>

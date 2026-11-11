@@ -1,0 +1,266 @@
+<div class="create-event-page page-container">
+  <!-- Back Button -->
+  <nav class="navigation-back">
+    <a routerLink="/app/events" class="btn btn-ghost btn-sm">
+      <span class="material-icons-round">arrow_back</span>
+      <span>Retour aux événements</span>
+    </a>
+  </nav>
+
+  <div class="form-wrapper card">
+    <header class="form-header">
+      <div class="header-icon-bubble">
+        <span class="material-icons-round">event_available</span>
+      </div>
+      <div>
+        <h1 class="header-title">Organiser un événement local</h1>
+        <p class="header-subtitle">
+          Proposez un atelier, une balade ou une rencontre aux familles de votre quartier.
+        </p>
+      </div>
+    </header>
+
+    <form [formGroup]="eventForm" (ngSubmit)="onSubmit()" class="event-form">
+      <!-- 1. Category Selector -->
+      <section class="form-section">
+        <label class="section-title">1. Type d'événement <span class="required">*</span></label>
+        <div class="categories-grid">
+          <button
+            *ngFor="let cat of categoryOptions"
+            type="button"
+            class="cat-option-btn"
+            [class.selected]="eventForm.get('category')?.value === cat.value"
+            (click)="selectCategory(cat.value)"
+          >
+            <div class="cat-icon-wrap">
+              <span class="material-icons-round">{{ cat.icon }}</span>
+            </div>
+            <div class="cat-info">
+              <span class="cat-title">{{ cat.label }}</span>
+              <span class="cat-desc">{{ cat.desc }}</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Basic Info -->
+      <section class="form-section">
+        <label class="section-title">2. Informations principales</label>
+
+        <!-- Title -->
+        <div class="form-group">
+          <label for="event-title">Titre de l'événement <span class="required">*</span></label>
+          <input
+            id="event-title"
+            type="text"
+            class="form-control"
+            formControlName="title"
+            placeholder="Ex: Atelier motricité libre et découverte sensorielle"
+            [class.has-error]="eventForm.get('title')?.invalid && eventForm.get('title')?.touched"
+          />
+          <div
+            *ngIf="eventForm.get('title')?.invalid && eventForm.get('title')?.touched"
+            class="form-error"
+          >
+            Le titre doit contenir entre 5 et 100 caractères.
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label for="event-desc">Description & Déroulement <span class="required">*</span></label>
+          <textarea
+            id="event-desc"
+            rows="5"
+            class="form-control"
+            formControlName="description"
+            placeholder="Précisez la tranche d'âge des enfants (ex: 6-18 mois), le déroulement, le matériel nécessaire (couverture, chaussettes antidérapantes, biberon...) et tout détail pratique utile."
+            [class.has-error]="eventForm.get('description')?.invalid && eventForm.get('description')?.touched"
+          ></textarea>
+          <div
+            *ngIf="eventForm.get('description')?.invalid && eventForm.get('description')?.touched"
+            class="form-error"
+          >
+            La description doit comporter au moins 20 caractères.
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Date, Time & Capacity -->
+      <section class="form-section">
+        <label class="section-title">3. Date, Horaires & Capacité</label>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="event-date">Date <span class="required">*</span></label>
+            <input
+              id="event-date"
+              type="date"
+              class="form-control"
+              formControlName="date"
+              [class.has-error]="eventForm.get('date')?.invalid && eventForm.get('date')?.touched"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="start-time">Heure de début <span class="required">*</span></label>
+            <input
+              id="start-time"
+              type="time"
+              class="form-control"
+              formControlName="startTime"
+              [class.has-error]="eventForm.get('startTime')?.invalid && eventForm.get('startTime')?.touched"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="end-time">Heure de fin (optionnel)</label>
+            <input
+              id="end-time"
+              type="time"
+              class="form-control"
+              formControlName="endTime"
+            />
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="max-participants">Nombre max de participants (familles) <span class="required">*</span></label>
+            <input
+              id="max-participants"
+              type="number"
+              min="2"
+              max="100"
+              class="form-control"
+              formControlName="maxParticipants"
+            />
+            <span class="helper-text">Les inscriptions se fermeront automatiquement une fois ce nombre atteint.</span>
+          </div>
+
+          <div class="form-group">
+            <label>Tarif de l'événement <span class="required">*</span></label>
+            <div class="pricing-toggle-group">
+              <button
+                type="button"
+                class="pricing-btn"
+                [class.active]="eventForm.get('isFree')?.value === true"
+                (click)="setFree(true)"
+              >
+                <span class="material-icons-round icon-sm">sentiment_very_satisfied</span>
+                <span>Gratuit</span>
+              </button>
+              <button
+                type="button"
+                class="pricing-btn"
+                [class.active]="eventForm.get('isFree')?.value === false"
+                (click)="setFree(false)"
+              >
+                <span class="material-icons-round icon-sm">payments</span>
+                <span>Payant</span>
+              </button>
+            </div>
+
+            <!-- Price input if paid -->
+            <div *ngIf="eventForm.get('isFree')?.value === false" class="price-input-wrapper">
+              <label for="price-field" class="price-label">Montant par famille (€) :</label>
+              <input
+                id="price-field"
+                type="number"
+                min="1"
+                class="form-control price-control"
+                formControlName="price"
+                placeholder="Ex: 5"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Location -->
+      <section class="form-section">
+        <label class="section-title">4. Lieu de rendez-vous</label>
+        <div class="form-group">
+          <label for="event-address">Adresse exacte ou point de repère <span class="required">*</span></label>
+          <input
+            id="event-address"
+            type="text"
+            class="form-control"
+            formControlName="address"
+            placeholder="Ex: Parc des Buttes-Chaumont (Entrée face métro), ou 14 Rue Saint-Ambroise"
+            [class.has-error]="eventForm.get('address')?.invalid && eventForm.get('address')?.touched"
+          />
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="event-city">Ville <span class="required">*</span></label>
+            <input
+              id="event-city"
+              type="text"
+              class="form-control"
+              formControlName="city"
+              placeholder="Paris"
+              [class.has-error]="eventForm.get('city')?.invalid && eventForm.get('city')?.touched"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="event-postal">Code postal <span class="required">*</span></label>
+            <input
+              id="event-postal"
+              type="text"
+              class="form-control"
+              formControlName="postalCode"
+              placeholder="75011"
+              [class.has-error]="eventForm.get('postalCode')?.invalid && eventForm.get('postalCode')?.touched"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Photo de couverture -->
+      <section class="form-section">
+        <label class="section-title">5. Image d'illustration</label>
+        <div class="preset-images-row">
+          <button
+            *ngFor="let p of imagePresets"
+            type="button"
+            class="preset-thumb-btn"
+            [class.active]="eventForm.get('imageUrl')?.value === p.url"
+            (click)="chooseImagePreset(p.url)"
+          >
+            <img [src]="p.url" [alt]="p.label" />
+            <span class="preset-name">{{ p.label }}</span>
+          </button>
+        </div>
+
+        <div class="form-group mt-3">
+          <label for="custom-image">Ou saisissez l'URL d'une image personnalisée :</label>
+          <input
+            id="custom-image"
+            type="url"
+            class="form-control"
+            formControlName="imageUrl"
+            placeholder="https://..."
+          />
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <div class="form-actions-row">
+        <a routerLink="/app/events" class="btn btn-secondary">
+          Annuler
+        </a>
+        <button
+          type="submit"
+          class="btn btn-primary btn-submit"
+          [disabled]="eventForm.invalid || isSubmitting"
+        >
+          <span class="material-icons-round" *ngIf="!isSubmitting">celebration</span>
+          <span class="spinner" *ngIf="isSubmitting"></span>
+          <span>{{ isSubmitting ? 'Création en cours...' : 'Publier l\'événement' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

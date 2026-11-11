@@ -1,0 +1,340 @@
+<div class="create-listing-page page-container">
+  <!-- Breadcrumb & Top Bar -->
+  <div class="top-nav-bar">
+    <a routerLink="/app/marketplace" class="btn btn-ghost btn-sm back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour à la Marketplace
+    </a>
+  </div>
+
+  <div class="form-layout-grid">
+    <!-- Main Form Column -->
+    <div class="form-main-col">
+      <div class="page-header">
+        <h1>{{ isEditMode ? 'Modifier l’annonce' : 'Publier une annonce' }}</h1>
+        <p>Partagez votre matériel avec les familles de votre quartier de manière simple, bienveillante et sécurisée.</p>
+      </div>
+
+      <form [formGroup]="listingForm" (ngSubmit)="onSubmit()" class="listing-form">
+        <!-- 1. Type d'annonce -->
+        <section class="card form-section-card">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md">category</span>
+            Type de transaction
+          </h2>
+          <p class="section-subtext">Choisissez comment vous souhaitez transmettre cet article.</p>
+
+          <div class="type-selector-grid">
+            <div
+              *ngFor="let t of listingTypes"
+              class="type-choice-card"
+              [class.selected]="listingForm.get('type')?.value === t.value"
+              [ngClass]="t.badgeClass"
+              (click)="selectType(t.value)"
+            >
+              <div class="type-icon-wrapper">
+                <span class="material-icons-round icon-lg">{{ t.icon }}</span>
+              </div>
+              <div class="type-details">
+                <span class="type-label">{{ t.label }}</span>
+                <span class="type-desc">{{ t.desc }}</span>
+              </div>
+              <div class="radio-indicator">
+                <span class="material-icons-round radio-check" *ngIf="listingForm.get('type')?.value === t.value">check_circle</span>
+                <span class="material-icons-round radio-uncheck" *ngIf="listingForm.get('type')?.value !== t.value">radio_button_unchecked</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Price input for SALE or optional deposit for LENDING -->
+          <div class="dynamic-pricing-box" *ngIf="listingForm.get('type')?.value === 'SALE'">
+            <div class="form-group price-form-group">
+              <label for="priceInput">Prix de vente (€) <span class="required-asterisk">*</span></label>
+              <div class="input-with-adornment">
+                <input
+                  id="priceInput"
+                  type="number"
+                  class="form-control"
+                  formControlName="price"
+                  placeholder="Ex: 15"
+                  min="0.5"
+                  step="0.5"
+                  [class.has-error]="listingForm.get('price')?.invalid && listingForm.get('price')?.touched"
+                />
+                <span class="currency-adornment">€ EUR</span>
+              </div>
+              <span class="form-error" *ngIf="listingForm.get('price')?.invalid && listingForm.get('price')?.touched">
+                Veuillez indiquer un prix valide (supérieur à 0 €).
+              </span>
+            </div>
+          </div>
+
+          <!-- LENDING deposit note -->
+          <div class="dynamic-pricing-box" *ngIf="listingForm.get('type')?.value === 'LENDING'">
+            <div class="form-group price-form-group">
+              <label for="depositInput">Caution éventuelle (€) <span class="optional-hint">(laissée à 0 si prêt sans caution)</span></label>
+              <div class="input-with-adornment">
+                <input
+                  id="depositInput"
+                  type="number"
+                  class="form-control"
+                  formControlName="price"
+                  placeholder="0"
+                  min="0"
+                />
+                <span class="currency-adornment">€ Caution</span>
+              </div>
+              <span class="input-help-text">Le prêt reste 100% gratuit entre parents de la communauté.</span>
+            </div>
+          </div>
+
+          <!-- EXCHANGE Preferences -->
+          <div class="dynamic-exchange-box" *ngIf="listingForm.get('type')?.value === 'EXCHANGE'">
+            <div class="form-group">
+              <label for="exchangePrefInput">Que recherchez-vous en échange ? <span class="required-asterisk">*</span></label>
+              <input
+                id="exchangePrefInput"
+                type="text"
+                class="form-control"
+                formControlName="exchangePreferences"
+                placeholder="Ex: Jouets d'éveil 12-18 mois, gigoteuse taille 2..."
+                [class.has-error]="listingForm.get('exchangePreferences')?.invalid && listingForm.get('exchangePreferences')?.touched"
+              />
+              <span class="form-error" *ngIf="listingForm.get('exchangePreferences')?.invalid && listingForm.get('exchangePreferences')?.touched">
+                Précisez ce que vous souhaitez recevoir en échange.
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Informations générales -->
+        <section class="card form-section-card">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md">info</span>
+            Détails de l'article
+          </h2>
+
+          <div class="form-group">
+            <label for="titleInput">Titre de l'annonce <span class="required-asterisk">*</span></label>
+            <input
+              id="titleInput"
+              type="text"
+              class="form-control"
+              formControlName="title"
+              placeholder="Ex: Poussette Cybex Eezy S Twist avec habillage pluie"
+              [class.has-error]="listingForm.get('title')?.invalid && listingForm.get('title')?.touched"
+            />
+            <span class="form-error" *ngIf="listingForm.get('title')?.invalid && listingForm.get('title')?.touched">
+              Le titre est obligatoire (au moins 4 caractères).
+            </span>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="categorySelect">Catégorie <span class="required-asterisk">*</span></label>
+              <select id="categorySelect" class="form-control" formControlName="category">
+                <option *ngFor="let cat of categories" [value]="cat.value">{{ cat.label }}</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="conditionSelect">État du matériel <span class="required-asterisk">*</span></label>
+              <select id="conditionSelect" class="form-control" formControlName="condition">
+                <option *ngFor="let cond of conditions" [value]="cond.value">{{ cond.label }} ({{ cond.hint }})</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="ageRangeSelect">Tranche d'âge cible</label>
+              <select id="ageRangeSelect" class="form-control" formControlName="targetAgeRange">
+                <option *ngFor="let age of ageRanges" [value]="age">{{ age }}</option>
+              </select>
+            </div>
+
+            <!-- Tags input -->
+            <div class="form-group">
+              <label for="tagsInput">Mots-clés (tags)</label>
+              <div class="tags-input-box">
+                <input
+                  id="tagsInput"
+                  type="text"
+                  class="form-control tag-text-input"
+                  placeholder="Tapez un mot-clé et appuyez sur Entrée"
+                  [(ngModel)]="tagInput"
+                  [ngModelOptions]="{standalone: true}"
+                  (keydown.enter)="addTag($event)"
+                />
+                <button type="button" class="btn btn-secondary btn-sm add-tag-btn" (click)="addTag($event)">
+                  Ajouter
+                </button>
+              </div>
+              <div class="tags-pill-list" *ngIf="tagsList.length > 0">
+                <span *ngFor="let tag of tagsList" class="tag-pill">
+                  #{{ tag }}
+                  <button type="button" class="remove-tag-btn" (click)="removeTag(tag)">
+                    <span class="material-icons-round icon-xs">close</span>
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="form-group">
+            <label for="descriptionInput">Description détaillée <span class="required-asterisk">*</span></label>
+            <textarea
+              id="descriptionInput"
+              class="form-control"
+              formControlName="description"
+              rows="5"
+              placeholder="Précisez la marque, la durée d'utilisation, l'état précis, les accessoires inclus..."
+              [class.has-error]="listingForm.get('description')?.invalid && listingForm.get('description')?.touched"
+            ></textarea>
+            <span class="form-error" *ngIf="listingForm.get('description')?.invalid && listingForm.get('description')?.touched">
+              Veuillez décrire l'article en au moins 15 caractères.
+            </span>
+          </div>
+        </section>
+
+        <!-- 3. Localisation -->
+        <section class="card form-section-card">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md">place</span>
+            Localisation & Remise en main propre
+          </h2>
+          <p class="section-subtext">Ces informations aident les parents voisins à trouver vos affaires à proximité.</p>
+
+          <div class="form-row-3">
+            <div class="form-group">
+              <label for="cityInput">Ville <span class="required-asterisk">*</span></label>
+              <input
+                id="cityInput"
+                type="text"
+                class="form-control"
+                formControlName="city"
+                placeholder="Ex: Paris"
+                [class.has-error]="listingForm.get('city')?.invalid && listingForm.get('city')?.touched"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="postalCodeInput">Code postal <span class="required-asterisk">*</span></label>
+              <input
+                id="postalCodeInput"
+                type="text"
+                class="form-control"
+                formControlName="postalCode"
+                placeholder="Ex: 75011"
+                [class.has-error]="listingForm.get('postalCode')?.invalid && listingForm.get('postalCode')?.touched"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="neighborhoodInput">Quartier (optionnel)</label>
+              <input
+                id="neighborhoodInput"
+                type="text"
+                class="form-control"
+                formControlName="neighborhood"
+                placeholder="Ex: Oberkampf / Bastille"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Photos de l'article -->
+        <section class="card form-section-card">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md">photo_camera</span>
+            Photo principale
+          </h2>
+          <p class="section-subtext">Ajoutez un lien direct vers une photo ou sélectionnez parmi nos modèles :</p>
+
+          <div class="form-group">
+            <label for="imageUrlInput">URL de la photo</label>
+            <input
+              id="imageUrlInput"
+              type="url"
+              class="form-control"
+              formControlName="imageUrl"
+              placeholder="https://images.unsplash.com/..."
+            />
+          </div>
+
+          <div class="sample-images-row">
+            <span class="sample-label">Ou choisir un visuel d'exemple :</span>
+            <div class="sample-thumbnails">
+              <button
+                *ngFor="let sample of sampleImages"
+                type="button"
+                class="sample-btn"
+                [class.active]="listingForm.get('imageUrl')?.value === sample.url"
+                (click)="selectSampleImage(sample)"
+              >
+                <img [src]="sample.url" [alt]="sample.label" />
+                <span class="sample-name">{{ sample.label }}</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Form Action Buttons -->
+        <div class="form-actions-bar">
+          <a routerLink="/app/marketplace" class="btn btn-secondary">
+            Annuler
+          </a>
+          <button type="submit" class="btn btn-primary submit-btn" [disabled]="isSubmitting">
+            <span class="material-icons-round icon-sm" *ngIf="!isSubmitting">{{ isEditMode ? 'save' : 'publish' }}</span>
+            <span class="material-icons-round icon-sm spin-loader" *ngIf="isSubmitting">sync</span>
+            <span>{{ isSubmitting ? 'Enregistrement en cours...' : (isEditMode ? 'Enregistrer les modifications' : 'Publier mon annonce') }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Live Preview Sidebar Column -->
+    <aside class="form-preview-col">
+      <div class="card preview-card">
+        <div class="preview-header">
+          <span class="material-icons-round icon-sm">visibility</span>
+          Aperçu en direct de l'annonce
+        </div>
+
+        <div class="preview-thumb-wrap">
+          <img
+            [src]="listingForm.get('imageUrl')?.value || 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80'"
+            alt="Preview"
+          />
+          <span class="badge preview-type-badge" [ngClass]="'badge-' + listingForm.get('type')?.value?.toLowerCase()">
+            {{ listingForm.get('type')?.value === 'DONATION' ? 'Don' : (listingForm.get('type')?.value === 'SALE' ? 'À vendre' : (listingForm.get('type')?.value === 'LENDING' ? 'Prêt' : 'Échange')) }}
+          </span>
+        </div>
+
+        <div class="preview-body">
+          <div class="preview-price-row">
+            <span class="preview-category">{{ listingForm.get('category')?.value }}</span>
+            <span class="preview-price" *ngIf="listingForm.get('type')?.value === 'SALE'">{{ listingForm.get('price')?.value || 0 }} €</span>
+            <span class="preview-price free" *ngIf="listingForm.get('type')?.value === 'DONATION'">Gratuit</span>
+            <span class="preview-price free" *ngIf="listingForm.get('type')?.value === 'LENDING'">Prêt</span>
+            <span class="preview-price exchange" *ngIf="listingForm.get('type')?.value === 'EXCHANGE'">Échange</span>
+          </div>
+
+          <h3 class="preview-title">{{ listingForm.get('title')?.value || 'Titre de l’annonce' }}</h3>
+
+          <p class="preview-desc">{{ listingForm.get('description')?.value || 'Votre description apparaîtra ici...' }}</p>
+
+          <div class="preview-location">
+            <span class="material-icons-round icon-sm">location_on</span>
+            <span>{{ listingForm.get('neighborhood')?.value || listingForm.get('city')?.value || 'Paris' }}</span>
+          </div>
+
+          <div class="preview-tags" *ngIf="tagsList.length > 0">
+            <span *ngFor="let t of tagsList" class="preview-tag-chip">#{{ t }}</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>

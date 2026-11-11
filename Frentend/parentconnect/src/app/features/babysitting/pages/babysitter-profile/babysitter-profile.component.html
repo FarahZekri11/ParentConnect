@@ -1,0 +1,249 @@
+<div class="profile-page">
+  <!-- Back Navigation -->
+  <div class="top-nav">
+    <a routerLink="/app/babysitting" class="back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour à la liste des baby-sitters
+    </a>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="profile-skeleton card">
+    <div class="skeleton" style="height: 120px; border-radius: 16px;"></div>
+    <div class="skeleton" style="height: 200px; margin-top: 20px;"></div>
+  </div>
+
+  <div *ngIf="!loading && babysitter" class="profile-content">
+    <!-- Profile Hero Card -->
+    <div class="card profile-hero">
+      <div class="hero-main">
+        <div class="avatar-wrap">
+          <img
+            *ngIf="babysitter.avatar"
+            [src]="babysitter.avatar"
+            [alt]="babysitter.firstName + ' ' + babysitter.lastName"
+            class="avatar avatar-2xl"
+          />
+          <div *ngIf="!babysitter.avatar" class="avatar avatar-2xl fallback-avatar">
+            {{ getInitials(babysitter.firstName, babysitter.lastName) }}
+          </div>
+          <span *ngIf="babysitter.verified" class="verified-badge-icon" title="Profil vérifié">
+            <span class="material-icons-round">verified</span>
+          </span>
+        </div>
+
+        <div class="hero-details">
+          <div class="name-line">
+            <h1>{{ babysitter.firstName }} {{ babysitter.lastName }}</h1>
+            <span *ngIf="babysitter.verified" class="badge-verified">
+              <span class="material-icons-round icon-sm">check_circle</span>
+              Profil Vérifié
+            </span>
+          </div>
+
+          <div class="meta-line">
+            <span class="location">
+              <span class="material-icons-round icon-sm">place</span>
+              {{ babysitter.neighborhood }}, {{ babysitter.city }}
+            </span>
+            <span class="bullet">•</span>
+            <div class="rating-display">
+              <span class="material-icons-round star-icon">star</span>
+              <span class="rating-score">{{ babysitter.rating | number:'1.1-2' }}</span>
+              <span class="rating-count">({{ babysitter.reviewCount }} avis de parents)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-cta">
+        <div class="rate-box">
+          <span class="rate-num">{{ babysitter.hourlyRate }}€</span>
+          <span class="rate-unit">/ heure</span>
+        </div>
+        <button type="button" class="btn btn-primary btn-book-hero" (click)="requestBooking()">
+          <span class="material-icons-round">calendar_month</span>
+          Demander une garde
+        </button>
+      </div>
+    </div>
+
+    <!-- 2-Columns Layout -->
+    <div class="details-layout">
+      <!-- Main Content Column -->
+      <div class="main-column">
+        <!-- Bio Section -->
+        <section class="card section-card">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md section-icon">face</span>
+            À propos de {{ babysitter.firstName }}
+          </h2>
+          <p class="bio-full">{{ babysitter.bio }}</p>
+        </section>
+
+        <!-- Experience & Qualifications -->
+        <section class="card section-card" *ngIf="babysitter.experience">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md section-icon">history_edu</span>
+            Expérience & Parcours
+          </h2>
+          <p class="experience-text">{{ babysitter.experience }}</p>
+        </section>
+
+        <!-- Verified Diplomas & Certifications -->
+        <section class="card section-card" *ngIf="babysitter.certifications && babysitter.certifications.length > 0">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md section-icon">military_tech</span>
+            Diplômes & Certifications vérifiés
+          </h2>
+          <div class="certifications-list">
+            <div class="cert-card" *ngFor="let cert of babysitter.certifications">
+              <span class="material-icons-round cert-check">verified</span>
+              <span class="cert-title">{{ cert }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Age Groups & Languages -->
+        <section class="card section-card">
+          <h2 class="section-heading">
+            <span class="material-icons-round icon-md section-icon">psychology</span>
+            Compétences & Tranches d'âge
+          </h2>
+
+          <div class="sub-block" *ngIf="babysitter.ageGroups && babysitter.ageGroups.length > 0">
+            <span class="sub-label">Tranches d'âge prises en charge :</span>
+            <div class="pills-row">
+              <span class="skill-pill" *ngFor="let age of babysitter.ageGroups">
+                <span class="material-icons-round icon-sm">child_care</span>
+                {{ age }}
+              </span>
+            </div>
+          </div>
+
+          <div class="sub-block" *ngIf="babysitter.languages && babysitter.languages.length > 0">
+            <span class="sub-label">Langues parlées :</span>
+            <div class="pills-row">
+              <span class="skill-pill lang-pill" *ngFor="let lang of babysitter.languages">
+                <span class="material-icons-round icon-sm">translate</span>
+                {{ lang }}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Weekly Availability Calendar Grid -->
+        <section class="card section-card">
+          <div class="availability-header">
+            <h2 class="section-heading">
+              <span class="material-icons-round icon-md section-icon">calendar_month</span>
+              Planning des disponibilités hebdomadaires
+            </h2>
+            <span class="avail-legend">
+              <span class="dot-available"></span> Disponible
+            </span>
+          </div>
+
+          <div class="schedule-grid">
+            <div
+              *ngFor="let day of weekSchedule"
+              class="day-slot-card"
+              [class.is-available]="day.isAvailable"
+            >
+              <div class="day-slot-header">
+                <span class="day-name">{{ day.dayName }}</span>
+                <span class="status-indicator">
+                  <span class="material-icons-round icon-sm">
+                    {{ day.isAvailable ? 'check_circle' : 'remove_circle_outline' }}
+                  </span>
+                </span>
+              </div>
+              <div class="day-slot-body">
+                <span *ngIf="day.isAvailable" class="slot-hours">{{ day.timeSlot }}</span>
+                <span *ngIf="!day.isAvailable" class="slot-unavailable">Non disponible</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Reviews / Comments Section -->
+        <section class="card section-card">
+          <div class="reviews-header">
+            <h2 class="section-heading">
+              <span class="material-icons-round icon-md section-icon">reviews</span>
+              Avis des familles ({{ babysitter.reviewCount }})
+            </h2>
+            <div class="average-badge">
+              <span class="material-icons-round star-icon">star</span>
+              <span class="avg-val">{{ babysitter.rating | number:'1.1-2' }} / 5</span>
+            </div>
+          </div>
+
+          <div *ngIf="babysitter.reviews && babysitter.reviews.length > 0" class="reviews-list">
+            <div class="review-item" *ngFor="let rev of babysitter.reviews">
+              <div class="rev-header">
+                <div class="rev-author">
+                  <div class="author-avatar">{{ rev.authorName.charAt(0) }}</div>
+                  <div>
+                    <span class="author-name">{{ rev.authorName }}</span>
+                    <span class="rev-date">{{ rev.date | date:'d MMMM y' }}</span>
+                  </div>
+                </div>
+
+                <div class="rev-rating">
+                  <span class="material-icons-round star-icon">star</span>
+                  <span>{{ rev.rating }} / 5</span>
+                </div>
+              </div>
+              <p class="rev-comment">« {{ rev.comment }} »</p>
+            </div>
+          </div>
+
+          <div *ngIf="!babysitter.reviews || babysitter.reviews.length === 0" class="no-reviews">
+            <p>Aucun commentaire rédigé pour le moment.</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- Sticky Booking Sidebar -->
+      <div class="sidebar-column">
+        <div class="card booking-widget">
+          <div class="widget-header">
+            <div class="price-line">
+              <span class="widget-price">{{ babysitter.hourlyRate }}€</span>
+              <span class="widget-unit">/ heure</span>
+            </div>
+            <div class="verified-pill">
+              <span class="material-icons-round icon-sm">verified_user</span>
+              100% Garanti
+            </div>
+          </div>
+
+          <div class="widget-perks">
+            <div class="perk-item">
+              <span class="material-icons-round icon-sm perk-icon">bolt</span>
+              <span>Réponse généralement en moins d'une heure</span>
+            </div>
+            <div class="perk-item">
+              <span class="material-icons-round icon-sm perk-icon">health_and_safety</span>
+              <span>Assurance garde d'enfants comprise</span>
+            </div>
+            <div class="perk-item">
+              <span class="material-icons-round icon-sm perk-icon">credit_card_off</span>
+              <span>Aucun paiement anticipé requis</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-primary btn-request-action" (click)="requestBooking()">
+            <span class="material-icons-round">calendar_month</span>
+            Demander une garde
+          </button>
+
+          <p class="widget-disclaimer">
+            Vous pourrez choisir la date, les heures et préciser les consignes à l'étape suivante.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

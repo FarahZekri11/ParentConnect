@@ -1,0 +1,186 @@
+<div class="my-bookings-page">
+  <!-- Top Navigation & Tabs Header -->
+  <div class="header-section">
+    <div class="header-content">
+      <div class="header-titles">
+        <div class="badge-category">
+          <span class="material-icons-round icon-sm">calendar_month</span>
+          Suivi des gardes
+        </div>
+        <h1>Mes réservations de baby-sitting</h1>
+        <p class="subtitle">Consultez l'historique et le statut de vos demandes de garde d'enfants.</p>
+      </div>
+
+      <div class="header-actions">
+        <a routerLink="/app/babysitting/new-request" class="btn btn-primary btn-publish">
+          <span class="material-icons-round">add_circle_outline</span>
+          Nouvelle demande
+        </a>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="navigation-tabs">
+      <a routerLink="/app/babysitting" class="nav-tab">
+        <span class="material-icons-round icon-sm">search</span>
+        Trouver un baby-sitter
+      </a>
+      <button class="nav-tab active">
+        <span class="material-icons-round icon-sm">calendar_month</span>
+        Mes réservations
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Pills -->
+  <div class="filters-row">
+    <button
+      class="chip"
+      [class.active]="activeFilter === 'ALL'"
+      (click)="setFilter('ALL')"
+    >
+      Toutes ({{ bookings.length }})
+    </button>
+    <button
+      class="chip"
+      [class.active]="activeFilter === 'PENDING'"
+      (click)="setFilter('PENDING')"
+    >
+      En attente
+    </button>
+    <button
+      class="chip"
+      [class.active]="activeFilter === 'ACCEPTED'"
+      (click)="setFilter('ACCEPTED')"
+    >
+      Confirmées
+    </button>
+    <button
+      class="chip"
+      [class.active]="activeFilter === 'COMPLETED'"
+      (click)="setFilter('COMPLETED')"
+    >
+      Terminées
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="bookings-list loading-list">
+    <div class="card card-skeleton" *ngFor="let i of [1, 2, 3]">
+      <div class="skeleton" style="height: 28px; width: 40%;"></div>
+      <div class="skeleton" style="height: 60px;"></div>
+      <div class="skeleton" style="height: 36px; width: 30%;"></div>
+    </div>
+  </div>
+
+  <!-- Bookings List -->
+  <div *ngIf="!loading && filteredBookings.length > 0" class="bookings-list">
+    <div class="card booking-card" *ngFor="let booking of filteredBookings">
+      <!-- Card Header: Date & Status -->
+      <div class="booking-header">
+        <div class="date-info">
+          <span class="material-icons-round icon-md date-icon">event</span>
+          <div>
+            <h3 class="booking-date">{{ booking.date | date:'EEEE d MMMM y' }}</h3>
+            <span class="booking-time">{{ booking.startTime }} - {{ booking.endTime }} ({{ booking.totalHours }}h)</span>
+          </div>
+        </div>
+
+        <div class="badge" [ngClass]="getStatusBadgeClass(booking.status)">
+          <span class="material-icons-round icon-sm">
+            {{ booking.status === 'ACCEPTED' ? 'check_circle' : (booking.status === 'PENDING' ? 'hourglass_top' : 'task_alt') }}
+          </span>
+          {{ getStatusLabel(booking.status) }}
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Card Body: Babysitter Info & Pricing -->
+      <div class="booking-body">
+        <div class="babysitter-details">
+          <img
+            *ngIf="booking.babysitterAvatar"
+            [src]="booking.babysitterAvatar"
+            [alt]="booking.babysitterName"
+            class="avatar avatar-lg"
+          />
+          <div *ngIf="!booking.babysitterAvatar" class="avatar avatar-lg fallback-avatar">
+            {{ booking.babysitterName.charAt(0) }}
+          </div>
+          <div>
+            <span class="bs-label">Baby-sitter assigné</span>
+            <h4 class="bs-name">{{ booking.babysitterName }}</h4>
+            <a [routerLink]="['/app/babysitting', booking.babysitterId]" class="profile-link">
+              <span class="material-icons-round icon-sm">visibility</span>
+              Voir le profil complet
+            </a>
+          </div>
+        </div>
+
+        <div class="pricing-details">
+          <div class="price-box">
+            <span class="price-title">Montant estimé</span>
+            <span class="price-value">{{ booking.totalCost }} €</span>
+            <span class="price-subtitle">pour {{ booking.totalHours }}h de garde</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Footer: Contextual Actions -->
+      <div class="booking-footer">
+        <div class="created-info">
+          Réservé le {{ booking.createdAt | date:'d MMM y' }}
+        </div>
+
+        <div class="action-buttons">
+          <button
+            *ngIf="booking.status === 'PENDING'"
+            class="btn btn-danger btn-sm"
+            (click)="cancelBooking(booking)"
+          >
+            <span class="material-icons-round icon-sm">close</span>
+            Annuler la demande
+          </button>
+
+          <a
+            *ngIf="booking.status === 'ACCEPTED'"
+            [routerLink]="['/app/messages']"
+            class="btn btn-secondary btn-sm"
+          >
+            <span class="material-icons-round icon-sm">chat</span>
+            Écrire un message
+          </a>
+
+          <a
+            *ngIf="booking.status === 'COMPLETED'"
+            [routerLink]="['/app/babysitting', booking.babysitterId]"
+            class="btn btn-secondary btn-sm"
+          >
+            <span class="material-icons-round icon-sm">repeat</span>
+            Réserver à nouveau
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && filteredBookings.length === 0" class="empty-state card">
+    <div class="empty-icon-wrap">
+      <span class="material-icons-round empty-icon">event_busy</span>
+    </div>
+    <h3>Aucune réservation trouvée</h3>
+    <p>Vous n'avez pas de réservation dans cette catégorie pour le moment.</p>
+    <div class="empty-actions">
+      <a routerLink="/app/babysitting" class="btn btn-primary">
+        <span class="material-icons-round icon-sm">search</span>
+        Trouver un baby-sitter
+      </a>
+      <a routerLink="/app/babysitting/new-request" class="btn btn-secondary">
+        <span class="material-icons-round icon-sm">add</span>
+        Créer une demande
+      </a>
+    </div>
+  </div>
+</div>

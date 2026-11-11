@@ -1,0 +1,247 @@
+<div class="post-detail-page page-container">
+  <!-- Back button -->
+  <nav class="navigation-back">
+    <a routerLink="/app/community" class="btn btn-ghost btn-sm">
+      <span class="material-icons-round">arrow_back</span>
+      <span>Retour au fil communautaire</span>
+    </a>
+  </nav>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="card skeleton post-skeleton"></div>
+    <div class="card skeleton comment-skeleton"></div>
+  </div>
+
+  <!-- Post Not Found -->
+  <div *ngIf="!isLoading && !post" class="card not-found-card">
+    <span class="material-icons-round not-found-icon">error_outline</span>
+    <h2>Publication introuvable</h2>
+    <p>Cette discussion n'existe plus ou a été retirée.</p>
+    <a routerLink="/app/community" class="btn btn-primary">Retour à la communauté</a>
+  </div>
+
+  <!-- Post Content Layout -->
+  <div *ngIf="!isLoading && post" class="post-layout">
+    <!-- Main Column: Post & Comments -->
+    <main class="post-main-content">
+      <!-- Full Post Card -->
+      <article class="post-full-card card">
+        <!-- Header -->
+        <header class="post-header">
+          <div class="author-block">
+            <div class="avatar avatar-lg">
+              <img
+                *ngIf="post.authorAvatar; else authorInitials"
+                [src]="post.authorAvatar"
+                [alt]="post.authorName"
+              />
+              <ng-template #authorInitials>
+                <span>{{ getInitials(post.authorName) }}</span>
+              </ng-template>
+            </div>
+            <div class="author-details">
+              <span class="author-name">{{ post.authorName }}</span>
+              <span class="post-date">Publié le {{ post.createdAt | date:'d MMMM yyyy, HH:mm' }}</span>
+            </div>
+          </div>
+
+          <div class="badges-row">
+            <span class="badge badge-accent">{{ getTypeLabel(post.type) }}</span>
+            <span class="badge badge-primary">{{ getCategoryLabel(post.category) }}</span>
+          </div>
+        </header>
+
+        <!-- Post Content -->
+        <div class="post-body">
+          <h1 class="post-title">{{ post.title }}</h1>
+          <div class="post-text">{{ post.content }}</div>
+
+          <!-- Post Images -->
+          <div *ngIf="post.images && post.images.length > 0" class="post-images-grid">
+            <div *ngFor="let img of post.images" class="post-img-container">
+              <img [src]="img" [alt]="post.title" />
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div *ngIf="post.tags && post.tags.length > 0" class="tags-row">
+            <span *ngFor="let tag of post.tags" class="tag-pill">#{{ tag }}</span>
+          </div>
+        </div>
+
+        <!-- Post Footer / Actions Toolbar -->
+        <footer class="post-actions-bar">
+          <div class="left-actions">
+            <button
+              type="button"
+              class="action-btn like-btn"
+              [class.active]="post.isLiked"
+              (click)="toggleLikePost()"
+            >
+              <span class="material-icons-round">
+                {{ post.isLiked ? 'favorite' : 'favorite_border' }}
+              </span>
+              <span>{{ post.likeCount }} J'aime</span>
+            </button>
+
+            <button
+              type="button"
+              class="action-btn save-btn"
+              [class.active]="post.isSaved"
+              (click)="toggleSavePost()"
+            >
+              <span class="material-icons-round">
+                {{ post.isSaved ? 'bookmark' : 'bookmark_border' }}
+              </span>
+              <span>{{ post.isSaved ? 'Enregistré' : 'Sauvegarder' }}</span>
+            </button>
+
+            <button type="button" class="action-btn share-btn" (click)="sharePost()">
+              <span class="material-icons-round">share</span>
+              <span>Partager</span>
+            </button>
+          </div>
+
+          <div class="right-actions">
+            <button type="button" class="btn-report" (click)="reportPost()">
+              <span class="material-icons-round icon-sm">flag</span>
+              <span>Signaler</span>
+            </button>
+          </div>
+        </footer>
+      </article>
+
+      <!-- Comments Section -->
+      <section class="comments-section card">
+        <div class="comments-header">
+          <div class="comments-title-wrap">
+            <span class="material-icons-round comments-icon">chat_bubble</span>
+            <h2>Commentaires & Réponses ({{ comments.length }})</h2>
+          </div>
+        </div>
+
+        <!-- Add Comment Box -->
+        <div class="add-comment-box">
+          <div class="avatar avatar-md user-avatar">
+            <img
+              *ngIf="currentUser?.avatar; else userInitialFallback"
+              [src]="currentUser?.avatar"
+              [alt]="currentUser?.firstName"
+            />
+            <ng-template #userInitialFallback>
+              <span>{{ getUserInitials() }}</span>
+            </ng-template>
+          </div>
+
+          <div class="comment-input-area">
+            <textarea
+              [(ngModel)]="newCommentText"
+              rows="3"
+              class="form-control comment-textarea"
+              placeholder="Apportez une réponse bienveillante ou partagez votre vécu..."
+            ></textarea>
+
+            <div class="comment-submit-row">
+              <span class="encouragement-text">
+                <span class="material-icons-round icon-sm text-success">eco</span>
+                <span>Votre réponse aide toute la communauté !</span>
+              </span>
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                [disabled]="!newCommentText.trim() || isSubmittingComment"
+                (click)="onSubmitComment()"
+              >
+                <span class="material-icons-round icon-sm">send</span>
+                <span>{{ isSubmittingComment ? 'Publication...' : 'Publier la réponse' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comments List -->
+        <div *ngIf="comments.length === 0" class="empty-comments">
+          <span class="material-icons-round empty-comment-icon">maps_ugc</span>
+          <p>Aucune réponse pour le moment. Soyez le premier parent à répondre !</p>
+        </div>
+
+        <div *ngIf="comments.length > 0" class="comments-list">
+          <div *ngFor="let comment of comments" class="comment-item">
+            <div class="avatar avatar-md comment-avatar">
+              <img
+                *ngIf="comment.authorAvatar; else commentAvatarInitial"
+                [src]="comment.authorAvatar"
+                [alt]="comment.authorName"
+              />
+              <ng-template #commentAvatarInitial>
+                <span>{{ getInitials(comment.authorName) }}</span>
+              </ng-template>
+            </div>
+
+            <div class="comment-content-block">
+              <div class="comment-bubble">
+                <div class="comment-author-row">
+                  <span class="comment-author-name">{{ comment.authorName }}</span>
+                  <span class="comment-date">{{ comment.createdAt | date:'d MMMM, HH:mm' }}</span>
+                </div>
+                <div class="comment-text">{{ comment.content }}</div>
+              </div>
+
+              <!-- Comment actions -->
+              <div class="comment-actions-bar">
+                <button
+                  type="button"
+                  class="comment-like-btn"
+                  [class.active]="comment.isLiked"
+                  (click)="toggleLikeComment(comment)"
+                >
+                  <span class="material-icons-round icon-sm">
+                    {{ comment.isLiked ? 'favorite' : 'favorite_border' }}
+                  </span>
+                  <span>{{ comment.likeCount }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Side Guidance Card -->
+    <aside class="post-side-column">
+      <div class="card guidance-card">
+        <div class="guidance-header">
+          <span class="material-icons-round text-accent">tips_and_updates</span>
+          <h3>À propos de cet échange</h3>
+        </div>
+        <div class="guidance-item">
+          <strong>Auteur :</strong>
+          <span>{{ post.authorName }}</span>
+        </div>
+        <div class="guidance-item">
+          <strong>Thématique :</strong>
+          <span>{{ getCategoryLabel(post.category) }}</span>
+        </div>
+        <div class="guidance-item">
+          <strong>Type :</strong>
+          <span>{{ getTypeLabel(post.type) }}</span>
+        </div>
+        <div class="guidance-item">
+          <strong>Date :</strong>
+          <span>{{ post.createdAt | date:'d MMMM yyyy' }}</span>
+        </div>
+      </div>
+
+      <div class="card safety-card">
+        <div class="guidance-header">
+          <span class="material-icons-round text-success">verified</span>
+          <h3>Espace sécurisé</h3>
+        </div>
+        <p>
+          Nos échanges sont modérés par la communauté. En cas de doute médical sérieux, consultez toujours les urgences pédiatriques ou composez le 15.
+        </p>
+      </div>
+    </aside>
+  </div>
+</div>
