@@ -1,5 +1,17 @@
 # ParentConnect - Geo & Neighborhood Service
 
+> **Note d'intégration (Standard 8080 & Eureka)** : Le service `geo-service` écoute sur le port standardisé **`0.0.0.0:8080`** (ou `$PORT`), s'enregistre auprès d'**Eureka** sous le nom **`PARENTCONNECT-GEO-SERVICE`** (`http://eureka-server:8761/eureka/`), écoute/publie sur **RabbitMQ** (`parentconnect.topic`, queue `geo_events_queue`), et valide l'authentification **Keycloak RS256** ou le **relais Gateway** (`X-Gateway-Auth: verified`).
+
+Pour lancer le service :
+- **En test local autonome** (Service + MongoDB dédié) :
+  ```bash
+  docker compose -f docker-compose.local-test.yml up --build
+  ```
+- **Pour l'intégration avec la stack partagée** (`parentconnect-network`) :
+  ```bash
+  docker compose -f docker-compose.service.yml up -d
+  ```
+
 Le **Geo & Neighborhood Service** est le microservice géospatial de la plateforme **ParentConnect**. Il gère la découpe des quartiers, le positionnement flouté et confidentiel des parents, la recherche de proximité pour les services partenaires (*Marketplace*, *Babysitting*, *Events*), les points de rencontre sécurisés ainsi que la vérification d'adresse par les pairs.
 
 ---
@@ -8,19 +20,20 @@ Le **Geo & Neighborhood Service** est le microservice géospatial de la platefor
 
 ```mermaid
 graph TD
-    Client[Application Mobile / Web] -->|REST /api/geo/| Nginx[API Gateway Nginx]
+    Client[Application Mobile / Web] -->|REST /api/geo/| Gateway[API Gateway :8080]
     OtherServices[Services Internes: Babysitting, Marketplace] -->|REST /internal/geo/ + X-Internal-Key| GeoService
 
-    Nginx -->|Proxy pass| GeoService[Geo & Neighborhood Service]
+    Gateway -->|Relais: X-Gateway-Auth: verified| GeoService[Geo & Neighborhood Service :8080]
 
     subgraph "Geo Service Boundary"
         GeoService -->|Motor Async Driver| GeoMongo[(MongoDB 7 geo_db)]
         GeoService -->|aio-pika| RMQPublisher[Event Publisher]
         RMQConsumer[Event Consumer] -->|Idempotent Handler| GeoMongo
+        GeoService -.->|Discovery & Heartbeat| Eureka[Eureka Server :8761]
     end
 
-    RMQ[RabbitMQ Broker - parentconnect.events]
-    RMQPublisher -->|geo.neighbor_joined / geo.address_verified| RMQ
+    RMQ[RabbitMQ Broker - parentconnect.topic]
+    RMQPublisher -->|geo.neighbor.joined / geo.address.verified| RMQ
     RMQ -->|identity.user_registered| RMQConsumer
     RMQConsumer -.->|Failed Events| DLQ[Dead Letter Queue geo.dlq]
 ```
@@ -31,7 +44,7 @@ graph TD
 
 1. **Database-per-service** : Base exclusive `geo_db`, jamais accédée par un autre service.
 2. **Aucune clé étrangère vers Identity** : Stockage strict de `user_id` sous forme de chaîne (`str`).
-3. **Autonomie au démarrage** : Le microservice valide les JWT localement via sa clé publique (`RS256`) ou secret partagé (`HS256`). Il démarre et fonctionne même si le service Identity est indisponible.
+3. **Autonomie au démarrage** : Le microservice valide les JWT localement via sa clé publique Keycloak (`RS256`), le mode relais Gateway (`X-Gateway-Auth: verified`) ou secret partagé (`HS256`). Il démarre et fonctionne même si le service Identity est indisponible.
 4. **Zéro coordonnée exacte, zéro donnée enfant** : L'adresse exacte n'est **jamais stockée** en base. Les coordonnées sont floutées côté serveur (~200m).
 5. **Protection Anti-Moyennage (Floutage Stable HMAC)** : Le décalage aléatoire est dérivé d'un hash HMAC du `user_id` et d'un sel serveur (`BLUR_SALT`). Un parent enregistrant sa position plusieurs fois conserve le même décalage spatial, rendant impossible toute attaque par moyennage statistique.
 6. **Protection Anti-Triangulation (/nearby)** : Sur l'endpoint public `/nearby`, les distances sont arrondies aux 100 mètres les plus proches (ex. 200m, 300m) et les coordonnées sont masquées. Seuls les endpoints internes protégés par `X-Internal-Key` reçoivent la distance exacte en mètres.
@@ -42,9 +55,10 @@ graph TD
 
 | Méthode | Chemin | Accès / Authentification | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | Public | Liveness probe (HTTP 200) |
+| `GET` | `/health` & `/api/health` | Public | Liveness probe (HTTP 200) pour Gateway et conteneurs |
 | `GET` | `/ready` | Public | Readiness probe (vérifie Mongo & RabbitMQ) |
 | `GET` | `/metrics` | Public | Métriques Prometheus (`prometheus-fastapi-instrumentator`) |
+| `GET` | `/api/geo/docs` | Public | Documentation interactive Swagger UI |
 | `POST` | `/api/geo/neighborhoods` | `Bearer JWT` (Rôle `ADMIN`) | Création d'un quartier avec polygone GeoJSON |
 | `GET` | `/api/geo/neighborhoods/{id}` | `Bearer JWT` | Détails d'un quartier |
 | `GET` | `/api/geo/neighborhoods/by-point` | `Bearer JWT` | Détection de quartier contenant un point (`$geoIntersects`) |

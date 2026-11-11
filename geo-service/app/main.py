@@ -1,3 +1,4 @@
+from app.eureka_client import eureka_client
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import json
@@ -68,6 +69,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     3. Start RabbitMQ consumer for domain events.
     4. Gracefully close connections on shutdown.
     """
+    
     logger.info("Initializing Geo & Neighborhood Service...")
 
     # 1. MongoDB initialization
@@ -89,12 +91,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await event_consumer.start()
     except Exception as e:
         logger.warning(f"RabbitMQ consumer initialization deferred: {e}")
+     
+        # 4. Register service in Eureka
+    try:
+        await eureka_client.start()
+    except Exception as e:
+        logger.warning(f"Eureka startup deferred: {e}")    
 
     logger.info("Geo & Neighborhood Service startup complete.")
 
     yield
 
     logger.info("Shutting down Geo & Neighborhood Service...")
+        # Stop Eureka registration and heartbeat
+    try:
+        await eureka_client.stop()
+    except Exception as e:
+        logger.error(f"Error stopping Eureka client: {e}")
     # Stop consumer
     try:
         await event_consumer.stop()

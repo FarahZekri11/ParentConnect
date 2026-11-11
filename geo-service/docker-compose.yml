@@ -55,6 +55,11 @@ services:
       - LOCATION_BLUR_M=200
       - BLUR_SALT=parentconnect-geo-blur-salt-secret
       - ADDRESS_VERIFICATION_THRESHOLD=2
+      - EUREKA_ENABLED=true
+      - EUREKA_SERVER_URL=http://parentconnect-eureka:8761/eureka/
+      - EUREKA_INSTANCE_HOST=parentconnect-geo-service
+      - EUREKA_INSTANCE_PORT=8000
+      - EUREKA_HEARTBEAT_INTERVAL=30
     depends_on:
       geo-mongo:
         condition: service_healthy

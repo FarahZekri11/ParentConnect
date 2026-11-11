@@ -23,6 +23,12 @@ class ReadinessResponse(BaseModel):
     summary="Liveness probe",
     description="Returns HTTP 200 as long as the service container process is running."
 )
+@router.get(
+    "/api/health",
+    response_model=HealthResponse,
+    summary="Public Gateway Health probe",
+    description="Returns HTTP 200 without authentication for API Gateway and monitoring."
+)
 async def liveness_check() -> HealthResponse:
     """Basic liveness probe."""
     return HealthResponse(status="ok")

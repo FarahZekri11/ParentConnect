@@ -33,8 +33,9 @@ class EventConsumer:
         while self.is_running:
             try:
                 logger.info("Initializing RabbitMQ consumer...")
+                rmq_url = settings.get_rabbitmq_url()
                 self.connection = await aio_pika.connect_robust(
-                    settings.RABBITMQ_URL,
+                    rmq_url,
                     timeout=5.0
                 )
                 self.channel = await self.connection.channel()

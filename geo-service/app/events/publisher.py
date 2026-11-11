@@ -23,9 +23,10 @@ class EventPublisher:
     async def connect(self) -> None:
         """Establish robust connection and declare topic exchange."""
         try:
-            logger.info(f"Connecting to RabbitMQ at {settings.RABBITMQ_URL.split('@')[-1] if '@' in settings.RABBITMQ_URL else settings.RABBITMQ_URL}")
+            rmq_url = settings.get_rabbitmq_url()
+            logger.info(f"Connecting to RabbitMQ at {rmq_url.split('@')[-1] if '@' in rmq_url else rmq_url}")
             self.connection = await aio_pika.connect_robust(
-                settings.RABBITMQ_URL,
+                rmq_url,
                 timeout=5.0
             )
             self.channel = await self.connection.channel()

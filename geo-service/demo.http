@@ -3,13 +3,17 @@
 ### Compatible with VS Code REST Client, IntelliJ HTTP Client & Postman
 ### ==============================================================================
 
-@baseUrl = http://localhost:8000
+@baseUrl = http://localhost:8080
 @internalKey = parentconnect-internal-geo-secret-key-32ch
 @adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbl90dW5pcyIsInJvbGUiOiJBRE1JTiIsImV4cCI6MTgyMzYyMDgzMX0.roSYqn8Y687WqOG1WOUflTaoJh5jo4YnwN3yr-6zdxs
 @user1Token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwYXJlbnRfc2FyYWgiLCJyb2xlIjoiVVNFUiIsImV4cCI6MTgyMzYyMDgzMX0.ke8vm7ntj0fSG1Tud8ZvH5tx0J1PALxY-KHyUZFiN1U
 @user2Token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJwYXJlbnRfa2FyaW0iLCJyb2xlIjoiVVNFUiIsImV4cCI6MTgyMzYyMDgzMX0.SK2rurwgALqposBFB3ofouPizDdhsuaWzgne4JID5Xs
 
-### 1. Healthcheck (Liveness)
+### 0. Healthcheck (API Gateway standard)
+GET {{baseUrl}}/api/health
+Accept: application/json
+
+### 1. Healthcheck (Liveness probe)
 GET {{baseUrl}}/health
 Accept: application/json
 

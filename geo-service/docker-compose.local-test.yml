@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  geo-mongo:
+    image: mongo:7
+    container_name: parentconnect-geo-mongo-local
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: geo_db
+    volumes:
+      - geo_local_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - geo-local-net
+
+  geo-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parentconnect-geo-service-local
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - MONGO_URL=mongodb://geo-mongo:27017
+      - MONGO_DB=geo_db
+      - EUREKA_ENABLED=false
+      - JWT_ALGORITHM=HS256
+      - JWT_SECRET=local-dev-secret-key-minimum-32-chars-long
+      - INTERNAL_API_KEY=parentconnect-internal-geo-secret-key-32ch
+      - LOCATION_BLUR_M=200
+      - BLUR_SALT=parentconnect-geo-blur-salt-secret
+      - ADDRESS_VERIFICATION_THRESHOLD=2
+      - MAX_SEARCH_RADIUS_M=10000
+    depends_on:
+      geo-mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - geo-local-net
+
+volumes:
+  geo_local_data:
+    driver: local
+
+networks:
+  geo-local-net:
+    driver: bridge
+
