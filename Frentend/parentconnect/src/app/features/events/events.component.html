@@ -1,0 +1,225 @@
+<div class="events-page page-container">
+  <!-- Header Section -->
+  <header class="events-header">
+    <div class="header-main-row">
+      <div class="header-intro">
+        <div class="header-badge">
+          <span class="material-icons-round icon-sm">local_activity</span>
+          <span>Activités et rencontres locales</span>
+        </div>
+        <h1 class="page-title">Événements de Quartier</h1>
+        <p class="page-subtitle">
+          Ateliers motricité, sorties poussette au parc, bourses aux jouets et cafés parents : rencontrez les familles près de chez vous !
+        </p>
+      </div>
+
+      <div class="header-cta" *ngIf="isAdmin">
+        <a routerLink="/app/events/new" class="btn btn-primary btn-create">
+          <span class="material-icons-round">add_circle_outline</span>
+          <span>Organiser un événement</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="events-filter-bar card">
+      <!-- Search Input -->
+      <div class="search-box">
+        <span class="material-icons-round search-icon">search</span>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Rechercher un atelier, un parc, une rue..."
+          [(ngModel)]="searchQuery"
+          (input)="onSearch()"
+        />
+        <button
+          *ngIf="searchQuery"
+          type="button"
+          class="btn-clear"
+          (click)="clearSearch()"
+          aria-label="Effacer"
+        >
+          <span class="material-icons-round">close</span>
+        </button>
+      </div>
+
+      <!-- Time Filter Pills -->
+      <div class="time-filter-pills">
+        <button
+          *ngIf="isParent"
+          type="button"
+          class="time-pill-btn mine-pill"
+          [class.active]="onlyMine"
+          (click)="toggleOnlyMine()"
+        >
+          <span class="material-icons-round icon-sm">bookmark_added</span>
+          Mes inscriptions
+        </button>
+        <button
+          *ngFor="let tf of timeFilters"
+          type="button"
+          class="time-pill-btn"
+          [class.active]="selectedTimeFilter === tf.key"
+          (click)="selectTimeFilter(tf.key)"
+        >
+          {{ tf.label }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Category Chips Carousel -->
+    <div class="category-chips-carousel">
+      <button
+        *ngFor="let cat of categories"
+        type="button"
+        class="chip"
+        [class.active]="selectedCategory === cat.key"
+        (click)="selectCategory(cat.key)"
+      >
+        <span class="material-icons-round icon-sm">{{ cat.icon }}</span>
+        <span>{{ cat.label }}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="events-loading-grid">
+    <div *ngFor="let s of [1, 2, 3, 4, 5, 6]" class="card skeleton event-skeleton"></div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && visibleEvents.length === 0" class="empty-events-card card">
+    <div class="empty-icon-circle">
+      <span class="material-icons-round">event_busy</span>
+    </div>
+    <h2>{{ loadError ? 'Service Événements indisponible' : (onlyMine ? 'Aucune inscription pour le moment' : 'Aucun événement trouvé') }}</h2>
+    <p *ngIf="loadError">Les événements n'ont pas pu être chargés. Réessayez dans un instant.</p>
+    <p *ngIf="!loadError && onlyMine">Inscrivez-vous à un événement : il apparaîtra ici.</p>
+    <p *ngIf="!loadError && !onlyMine">
+      Il n'y a actuellement aucun événement correspondant à vos critères de recherche.
+    </p>
+    <div class="empty-actions">
+      <button type="button" class="btn btn-secondary" (click)="resetFilters()">
+        {{ loadError ? 'Réessayer' : 'Réinitialiser les filtres' }}
+      </button>
+      <a *ngIf="isAdmin" routerLink="/app/events/new" class="btn btn-primary">
+        Créer un événement
+      </a>
+    </div>
+  </div>
+
+  <!-- Events Discovery Grid -->
+  <div *ngIf="!isLoading && visibleEvents.length > 0" class="events-grid">
+    <article *ngFor="let evt of visibleEvents; trackBy: trackById" class="event-card card card-hover"
+             [class.event-cancelled]="evt.status === 'CANCELLED'">
+      <!-- Media Cover -->
+      <div class="event-image-wrapper">
+        <img [src]="evt.imageUrl" [alt]="evt.title" class="event-image" loading="lazy" />
+
+        <!-- Floating Date Badge (Day + Month) -->
+        <div class="date-badge">
+          <span class="day">{{ getEventDay(evt.date) }}</span>
+          <span class="month">{{ getEventMonth(evt.date) }}</span>
+        </div>
+
+        <!-- Badges on Cover -->
+        <div class="overlay-badges">
+          <span class="badge badge-category">{{ getCategoryLabel(evt.category) }}</span>
+          <span *ngIf="evt.status === 'CANCELLED'" class="badge badge-cancelled">Annulé</span>
+          <span *ngIf="evt.status !== 'CANCELLED' && ageRange(evt)" class="badge badge-free">{{ ageRange(evt) }}</span>
+        </div>
+      </div>
+
+      <!-- Card Content -->
+      <div class="event-card-content">
+        <!-- Title & Organizer -->
+        <h2 class="event-title">
+          <a [routerLink]="['/app/events', evt.id]">{{ evt.title }}</a>
+        </h2>
+
+        <div class="event-organizer-row">
+          <span class="organizer-label">Organisé par</span>
+          <span class="organizer-name">{{ evt.organizerName }}</span>
+        </div>
+
+        <!-- Date & Location Meta -->
+        <div class="event-meta-list">
+          <div class="meta-item">
+            <span class="material-icons-round icon-sm text-icon">schedule</span>
+            <span>{{ evt.startTime }}<span *ngIf="evt.endTime"> - {{ evt.endTime }}</span></span>
+          </div>
+
+          <div class="meta-item location-item">
+            <span class="material-icons-round icon-sm text-icon">place</span>
+            <span class="truncate">{{ evt.address ? evt.address + ', ' : '' }}{{ evt.city }}</span>
+          </div>
+        </div>
+
+        <!-- Capacity / Participants Progress -->
+        <div class="capacity-section" *ngIf="evt.maxParticipants">
+          <div class="capacity-labels">
+            <span class="participants-text">
+              <span class="material-icons-round icon-sm">group</span>
+              <strong>{{ evt.participantCount }}</strong> / {{ evt.maxParticipants }} participants
+            </span>
+            <span class="capacity-status" [class.full]="isFull(evt)">
+              {{ isFull(evt) ? 'Complet' : ((evt.maxParticipants - evt.participantCount) + ' places restantes') }}
+            </span>
+          </div>
+
+          <div class="progress-bar-track">
+            <div
+              class="progress-bar-fill"
+              [style.width.%]="getCapacityPercentage(evt)"
+              [class.warning]="getCapacityPercentage(evt) >= 80 && !isFull(evt)"
+              [class.full]="isFull(evt)"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Card Footer Actions -->
+        <div class="event-card-footer">
+          <a [routerLink]="['/app/events', evt.id]" class="btn btn-secondary btn-sm btn-details">
+            Détails
+          </a>
+
+          <!-- Administrateur : gestion de l'événement -->
+          <a *ngIf="isAdmin" [routerLink]="['/app/events', evt.id]" class="btn btn-sm btn-primary btn-join">
+            <span class="material-icons-round icon-sm">manage_accounts</span>
+            <span>Gérer</span>
+          </a>
+
+          <!-- Parent : inscription rapide (1 enfant ; détails depuis la page de l'événement) -->
+          <button
+            *ngIf="isParent && evt.status === 'PUBLISHED'"
+            type="button"
+            class="btn btn-sm btn-join"
+            [ngClass]="{
+              'btn-joined': evt.isJoined,
+              'btn-primary': !evt.isJoined && !isFull(evt),
+              'btn-secondary': !evt.isJoined && isFull(evt)
+            }"
+            [disabled]="(!evt.isJoined && isFull(evt)) || pendingJoinId === evt.id"
+            (click)="toggleJoin(evt, $event)"
+          >
+            <ng-container *ngIf="evt.isJoined">
+              <span class="material-icons-round icon-sm">check_circle</span>
+              <span>Inscrit(e)</span>
+            </ng-container>
+
+            <ng-container *ngIf="!evt.isJoined && !isFull(evt)">
+              <span class="material-icons-round icon-sm">person_add</span>
+              <span>Participer</span>
+            </ng-container>
+
+            <ng-container *ngIf="!evt.isJoined && isFull(evt)">
+              <span class="material-icons-round icon-sm">block</span>
+              <span>Complet</span>
+            </ng-container>
+          </button>
+        </div>
+      </div>
+    </article>
+  </div>
+</div>

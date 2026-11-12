@@ -1,0 +1,48 @@
+# Version control
+.git
+.gitignore
+
+# Python environment & caches
+.venv
+venv
+env
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Testing & coverage
+.pytest_cache
+.coverage
+htmlcov
+tests
+
+# IDE & Editor files
+.idea
+.vscode
+*.iml
+*.swp
+*.bak
+
+# Environment & local credentials
+.env
+.env.local
+.env.*.local
+*.log
+
+# Docker Compose & local scripts
+docker-compose*.yml
+push_to_dockerhub.bat
+start_infra.bat
+stop_all.bat
+init_databases.sql
+init-multiple-dbs.sh
+gen_eureka.py
+setup_databases.py
+update_lifespans.py
+
+# Redundant central infra mock folders
+services
+gateway
+local_gateway
+keycloak

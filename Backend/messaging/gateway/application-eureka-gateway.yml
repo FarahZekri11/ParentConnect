@@ -1,0 +1,57 @@
+# ==============================================================================
+# Configuration Spring Cloud Gateway pour l'intégration de ParentConnect Messaging
+# ==============================================================================
+server:
+  port: 8080 # Port public de l'API Gateway Spring Cloud
+
+spring:
+  application:
+    name: API-GATEWAY
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # 1. Routage des endpoints REST du service de messagerie
+        - id: messaging-service-api
+          uri: lb://MESSAGING-SERVICE
+          predicates:
+            - Path=/api/conversations/**, /api/messages/**, /api/notifications/**
+          filters:
+            - StripPrefix=0
+
+        # 2. Routage WebSocket temps réel (Upgrade HTTP/1.1)
+        - id: messaging-service-ws
+          uri: lb:ws://MESSAGING-SERVICE
+          predicates:
+            - Path=/ws/**
+          filters:
+            - StripPrefix=0
+
+        # 3. Documentation Swagger UI
+        - id: messaging-service-swagger
+          uri: lb://MESSAGING-SERVICE
+          predicates:
+            - Path=/swagger/**
+          filters:
+            - StripPrefix=0
+
+        # 4. Sondes de santé & supervision
+        - id: messaging-service-health
+          uri: lb://MESSAGING-SERVICE
+          predicates:
+            - Path=/health, /ready
+          filters:
+            - StripPrefix=0
+
+# Configuration du client Eureka Discovery pour la Gateway
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true

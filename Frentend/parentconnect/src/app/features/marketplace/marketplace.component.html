@@ -1,0 +1,314 @@
+<div class="marketplace-page page-container">
+  <!-- Hero / Header Section -->
+  <header class="marketplace-header">
+    <div class="header-content">
+      <div class="header-titles">
+        <span class="header-eyebrow">
+          <span class="material-icons-round icon-sm">storefront</span>
+          Économie solidaire & circulaire entre parents
+        </span>
+        <h1 class="page-title">Marketplace ParentConnect</h1>
+        <p class="page-subtitle">
+          Donnez une seconde vie aux affaires de vos enfants : donnez, échangez, prêtez ou achetez en toute confiance dans votre quartier.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <a routerLink="/app/marketplace/favorites" class="btn btn-secondary fav-link-btn" title="Mes favoris">
+          <span class="material-icons-round icon-md">favorite</span>
+          <span class="btn-text">Favoris</span>
+        </a>
+        <a routerLink="/app/marketplace/my-listings" class="btn btn-secondary" title="Mes annonces">
+          <span class="material-icons-round icon-md">inventory_2</span>
+          <span class="btn-text">Mes annonces</span>
+        </a>
+        <a routerLink="/app/marketplace/new" class="btn btn-primary cta-publish-btn" title="Publier une annonce">
+          <span class="material-icons-round icon-md">add_circle</span>
+          <span>Publier une annonce</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Live Search & Type Tabs Bar -->
+    <div class="search-and-types-bar card">
+      <!-- Search Input -->
+      <div class="search-input-wrapper">
+        <span class="material-icons-round search-icon">search</span>
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Rechercher une poussette, un lit parapluie, des vêtements..."
+          [ngModel]="searchQuery"
+          (ngModelChange)="onSearchInput($event)"
+        />
+        <button
+          *ngIf="searchQuery"
+          type="button"
+          class="clear-search-btn"
+          (click)="clearSearch()"
+          aria-label="Effacer la recherche"
+        >
+          <span class="material-icons-round icon-sm">close</span>
+        </button>
+      </div>
+
+      <!-- Type Filter Tabs (Tous, À donner, À vendre, etc.) -->
+      <div class="type-pills">
+        <button
+          *ngFor="let tab of typeTabs"
+          type="button"
+          class="type-pill-btn"
+          [class.active]="selectedType === tab.key"
+          [attr.data-type]="tab.key"
+          (click)="selectType(tab.key)"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Category Chips Carousel / List -->
+    <div class="categories-carousel">
+      <button
+        *ngFor="let cat of categories"
+        type="button"
+        class="chip category-chip"
+        [class.active]="selectedCategory === cat.key"
+        (click)="selectCategory(cat.key)"
+      >
+        <span class="material-icons-round icon-sm">{{ cat.icon }}</span>
+        <span>{{ cat.label }}</span>
+      </button>
+    </div>
+
+    <!-- Secondary Filters Row (Condition, Prix, Tri, Ville) -->
+    <div class="filters-row">
+      <div class="filter-controls-left">
+        <!-- État filter -->
+        <div class="filter-select-wrapper">
+          <label for="conditionSelect" class="filter-label">État :</label>
+          <select
+            id="conditionSelect"
+            class="filter-select"
+            [(ngModel)]="selectedCondition"
+            (change)="onFilterChange()"
+          >
+            <option *ngFor="let cond of conditions" [value]="cond.value">{{ cond.label }}</option>
+          </select>
+        </div>
+
+        <!-- Prix Min & Max (visible for sales or all) -->
+        <div class="price-range-group" *ngIf="selectedType !== 'DONATION'">
+          <span class="filter-label">Prix :</span>
+          <input
+            type="number"
+            class="price-input"
+            placeholder="Min"
+            [(ngModel)]="minPrice"
+            (change)="onFilterChange()"
+            min="0"
+          />
+          <span class="price-separator">-</span>
+          <input
+            type="number"
+            class="price-input"
+            placeholder="Max"
+            [(ngModel)]="maxPrice"
+            (change)="onFilterChange()"
+            min="0"
+          />
+        </div>
+
+        <!-- City filter -->
+        <div class="city-filter-wrapper">
+          <span class="material-icons-round icon-sm filter-city-icon">location_on</span>
+          <input
+            type="text"
+            class="city-input"
+            placeholder="Ville (ex: Paris)"
+            [(ngModel)]="selectedCity"
+            (change)="onFilterChange()"
+          />
+        </div>
+
+        <!-- Reset Button if filtered -->
+        <button
+          *ngIf="selectedCategory !== 'ALL' || selectedType !== 'ALL' || selectedCondition !== 'ALL' || searchQuery || minPrice !== null || maxPrice !== null || selectedCity"
+          type="button"
+          class="btn btn-ghost btn-sm reset-filters-btn"
+          (click)="resetFilters()"
+        >
+          <span class="material-icons-round icon-sm">restart_alt</span>
+          Réinitialiser
+        </button>
+      </div>
+
+      <!-- Sorting Select -->
+      <div class="filter-controls-right">
+        <label for="sortSelect" class="filter-label">Trier par :</label>
+        <select
+          id="sortSelect"
+          class="filter-select"
+          [(ngModel)]="sortBy"
+          (change)="onFilterChange()"
+        >
+          <option value="recent">Plus récentes</option>
+          <option value="price_asc">Prix croissant</option>
+          <option value="price_desc">Prix décroissant</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content Section -->
+  <main class="marketplace-content">
+    <!-- 1. Skeleton Loading Grid -->
+    <div *ngIf="isLoading" class="listings-grid">
+      <div *ngFor="let s of [1,2,3,4,5,6,7,8]" class="card listing-skeleton-card">
+        <div class="skeleton skeleton-thumb"></div>
+        <div class="skeleton-body">
+          <div class="skeleton skeleton-badge"></div>
+          <div class="skeleton skeleton-title"></div>
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton-footer">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton skeleton-price"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Error State -->
+    <div *ngIf="!isLoading && errorMessage" class="card state-box error-state">
+      <span class="material-icons-round state-icon">error_outline</span>
+      <h3>Oups ! Une erreur est survenue</h3>
+      <p>{{ errorMessage }}</p>
+      <button type="button" class="btn btn-primary" (click)="loadListings()">
+        <span class="material-icons-round icon-sm">refresh</span>
+        Réessayer
+      </button>
+    </div>
+
+    <!-- 3. Empty State -->
+    <div *ngIf="!isLoading && !errorMessage && listings.length === 0" class="card state-box empty-state">
+      <div class="empty-icon-wrap">
+        <span class="material-icons-round state-icon">sentiment_dissatisfied</span>
+      </div>
+      <h3>Aucune annonce trouvée</h3>
+      <p>Aucun article ne correspond à vos filtres actuels. Modifiez vos critères de recherche ou soyez le premier à poster une annonce !</p>
+      <div class="empty-state-actions">
+        <button type="button" class="btn btn-secondary" (click)="resetFilters()">
+          Effacer les filtres
+        </button>
+        <a routerLink="/app/marketplace/new" class="btn btn-primary">
+          <span class="material-icons-round icon-sm">add_circle</span>
+          Publier cette annonce
+        </a>
+      </div>
+    </div>
+
+    <!-- 4. Listings Grid -->
+    <div *ngIf="!isLoading && !errorMessage && listings.length > 0" class="listings-grid">
+      <article
+        *ngFor="let item of listings"
+        class="card listing-card card-hover"
+        [routerLink]="['/app/marketplace', item.id]"
+      >
+        <!-- Media / Thumb Header -->
+        <div class="listing-thumb-wrap">
+          <img
+            [src]="item.images && item.images.length ? item.images[0] : 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80'"
+            [alt]="item.title"
+            class="listing-image"
+            loading="lazy"
+            (error)="onImageError($event)"
+          />
+
+          <!-- Type Badge (SALE, DONATION, LENDING, EXCHANGE) -->
+          <span class="badge listing-type-badge" [ngClass]="getTypeBadgeClass(item.type)">
+            {{ getTypeLabel(item.type) }}
+          </span>
+
+          <!-- Condition Badge -->
+          <span class="badge badge-neutral listing-condition-badge">
+            {{ getConditionLabel(item.condition) }}
+          </span>
+
+          <!-- Favorite Heart Button -->
+          <button
+            type="button"
+            class="fav-toggle-btn"
+            [class.favorited]="item.isFavorited"
+            (click)="toggleFavorite($event, item)"
+            [attr.aria-label]="item.isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+          >
+            <span class="material-icons-round icon-md">
+              {{ item.isFavorited ? 'favorite' : 'favorite_border' }}
+            </span>
+          </button>
+        </div>
+
+        <!-- Card Body -->
+        <div class="listing-card-body">
+          <div class="listing-top-info">
+            <span class="listing-category-tag">
+              <span class="material-icons-round icon-sm">category</span>
+              {{ getCategoryLabel(item.category) }}
+            </span>
+            <div class="listing-price-tag" [ngClass]="getTypeBadgeClass(item.type)">
+              {{ getPriceDisplay(item) }}
+            </div>
+          </div>
+
+          <h3 class="listing-title" [title]="item.title">
+            {{ item.title }}
+          </h3>
+
+          <p class="listing-description-preview">
+            {{ item.description }}
+          </p>
+
+          <!-- Location & Exchange preferences -->
+          <div class="listing-meta">
+            <div class="meta-location">
+              <span class="material-icons-round icon-sm">location_on</span>
+              <span class="truncate">
+                {{ item.location.neighborhood || item.location.city || 'Non renseigné' }}
+                <span *ngIf="item.location.postalCode">({{ item.location.postalCode }})</span>
+              </span>
+            </div>
+
+            <div *ngIf="item.type === 'EXCHANGE' && item.exchangePreferences" class="meta-exchange truncate">
+              <span class="material-icons-round icon-sm">sync_alt</span>
+              <span>{{ item.exchangePreferences }}</span>
+            </div>
+          </div>
+
+          <hr class="divider card-divider" />
+
+          <!-- Card Footer: Owner Info & CTA -->
+          <div class="listing-card-footer">
+            <div class="owner-info">
+              <div class="avatar avatar-sm owner-avatar">
+                <img *ngIf="item.ownerAvatar" [src]="item.ownerAvatar" [alt]="item.ownerName" />
+                <span *ngIf="!item.ownerAvatar">{{ getInitials(item.ownerName) }}</span>
+              </div>
+              <span class="owner-name truncate">{{ item.ownerName }}</span>
+            </div>
+
+            <span class="view-detail-hint">
+              <span>Voir</span>
+              <span class="material-icons-round icon-sm">arrow_forward</span>
+            </span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <!-- Floating Mobile "Publier une annonce" FAB -->
+  <a routerLink="/app/marketplace/new" class="floating-fab-btn" title="Publier une annonce">
+    <span class="material-icons-round">add</span>
+    <span class="fab-label">Publier</span>
+  </a>
+</div>

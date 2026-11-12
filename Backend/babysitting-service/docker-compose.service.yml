@@ -1,0 +1,108 @@
+version: "3.9"
+
+services:
+  # ── Microservice Babysitting ────────────────────────────────────────────────
+  babysitting-service:
+    build:
+      context: .
+      target: production
+    container_name: babysitting-service
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - APP_PORT=8080
+      - SERVICE_PORT=8080
+      - SERVICE_NAME=babysitting-service
+      - SERVICE_VERSION=0.1.0
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+
+      # Base de données PostgreSQL dédiée
+      - DATABASE_URL=postgresql+asyncpg://babysitting:babysitting_pass@babysitting-db:5432/babysitting_db
+
+      # Cache Redis dédié
+      - REDIS_URL=redis://babysitting-redis:6379/0
+
+      # Authentification Keycloak (RS256)
+      - KEYCLOAK_REALM_PUBLIC_KEY=${KEYCLOAK_REALM_PUBLIC_KEY:-}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-parentconnect}
+      - JWT_ALGORITHM=RS256
+
+      # Service Discovery (Eureka Server partagé de l'équipe)
+      - EUREKA_ENABLED=true
+      - EUREKA_SERVER_URL=${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      - EUREKA_APP_NAME=PARENTCONNECT-BABYSITTING
+      - EUREKA_INSTANCE_HOST=babysitting-service
+      - EUREKA_HEARTBEAT_INTERVAL=30
+      - EUREKA_LEASE_DURATION=90
+
+      # Messagerie Événementielle RabbitMQ partagée de l'équipe
+      - RABBITMQ_ENABLED=true
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
+      - RABBITMQ_EXCHANGE=parentconnect.topic
+      - RABBITMQ_QUEUE=babysitting_events_queue
+
+      # Communication Inter-Services (Identity Service)
+      - USE_MOCK_IDENTITY=false
+      - IDENTITY_SERVICE_URL=${IDENTITY_SERVICE_URL:-http://identity-service:8080}
+    depends_on:
+      babysitting-db:
+        condition: service_healthy
+      babysitting-redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8080
+      "
+    restart: unless-stopped
+    networks:
+      - parentconnect-network
+
+  # ── Base de Données PostgreSQL 16 (Dédiée au microservice) ──────────────────
+  babysitting-db:
+    image: postgres:16-alpine
+    container_name: babysitting-db
+    environment:
+      POSTGRES_USER: babysitting
+      POSTGRES_PASSWORD: babysitting_pass
+      POSTGRES_DB: babysitting_db
+    volumes:
+      - babysitting_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U babysitting -d babysitting_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - parentconnect-network
+
+  # ── Cache Redis 7 (Dédié au microservice) ───────────────────────────────────
+  babysitting-redis:
+    image: redis:7-alpine
+    container_name: babysitting-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - babysitting_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - parentconnect-network
+
+volumes:
+  babysitting_pgdata:
+  babysitting_redisdata:
+
+networks:
+  parentconnect-network:
+    external: true

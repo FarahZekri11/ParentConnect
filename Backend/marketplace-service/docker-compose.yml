@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  marketplace-mongodb:
+    image: mongo:7.0
+    container_name: parentconnect_marketplace_db
+    restart: always
+    ports:
+      - '27017:27017'
+    volumes:
+      - marketplace_mongo_data:/data/db
+    networks:
+      - parentconnect-network
+
+  marketplace-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parentconnect_marketplace_service
+    restart: always
+    ports:
+      - '3002:3002'
+    environment:
+      - PORT=3002
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://marketplace-mongodb:27017/parentconnect_marketplace
+      - JWT_SECRET=parentconnect_jwt_secret_key
+    depends_on:
+      - marketplace-mongodb
+    networks:
+      - parentconnect-network
+
+volumes:
+  marketplace_mongo_data:
+
+networks:
+  parentconnect-network:
+    driver: bridge

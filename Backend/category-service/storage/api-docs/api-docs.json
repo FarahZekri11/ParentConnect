@@ -1,0 +1,116 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "ParentConnect - Community Service API",
+        "description": "Microservice Communauté pour la plateforme ParentConnect : gestion des publications, questions, commentaires, catégories et signalements (modération).",
+        "contact": {
+            "name": "ParentConnect Community Team",
+            "email": "dev@parentconnect.internal"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/",
+            "description": "Community Service API Gateway / Direct Server"
+        }
+    ],
+    "paths": {
+        "/api/health": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Vérification de l'état de santé du service",
+                "description": "Healthcheck public sans authentification utilisé par Kubernetes / Docker / API Gateway.",
+                "operationId": "24b74a809d1f5913ec7794d867bc24f4",
+                "responses": {
+                    "200": {
+                        "description": "Service opérationnel",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "UP"
+                                        },
+                                        "service": {
+                                            "type": "string",
+                                            "example": "community-service"
+                                        },
+                                        "database": {
+                                            "type": "string",
+                                            "example": "connected"
+                                        },
+                                        "timestamp": {
+                                            "type": "string",
+                                            "example": "2026-10-15T18:00:00Z"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "CategoryResource": {
+                "title": "CategoryResource",
+                "description": "Représentation d'une catégorie",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Sommeil & Éveil"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "sommeil-eveil"
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Échanges sur le rythme de sommeil",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "description": "JWT émis par l'Identity Service (claims : sub = user_id, role = PARENT|PROFESSIONAL|ADMIN)",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            },
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Token JWT Bearer. Obtenez-le via POST /api/auth/login (token HS256) ou via Keycloak (token RS256). Collez uniquement le token sans le mot Bearer."
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Health",
+            "description": "Surveillance et état de santé du microservice"
+        }
+    ]
+}

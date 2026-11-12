@@ -1,0 +1,21 @@
+security:
+  jwt:
+    # La clé publique RS256 du realm de test est injectée par AbstractIntegrationTest
+    issuer: http://keycloak:8080/realms/parentconnect
+  internal:
+    api-key: test-internal-key
+
+app:
+  scheduling:
+    complete-events:
+      enabled: false
+
+logging:
+  level:
+    com.parentconnect: INFO
+    org.testcontainers: WARN
+
+# Pas d'annuaire Eureka pendant les tests
+eureka:
+  client:
+    enabled: false

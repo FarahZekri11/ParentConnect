@@ -1,0 +1,162 @@
+<div class="create-event-page page-container">
+  <!-- Back Button -->
+  <nav class="navigation-back">
+    <a [routerLink]="isEdit ? ['/app/events', editId] : ['/app/events']" class="btn btn-ghost btn-sm">
+      <span class="material-icons-round">arrow_back</span>
+      <span>{{ isEdit ? 'Retour à l\'événement' : 'Retour aux événements' }}</span>
+    </a>
+  </nav>
+
+  <div *ngIf="isLoading" class="card skeleton" style="height: 420px"></div>
+
+  <div *ngIf="!isLoading && eventForm" class="form-wrapper card">
+    <header class="form-header">
+      <div class="header-icon-bubble">
+        <span class="material-icons-round">{{ isEdit ? 'edit_calendar' : 'event_available' }}</span>
+      </div>
+      <div>
+        <h1 class="header-title">{{ isEdit ? 'Modifier l\'événement' : 'Organiser un événement local' }}</h1>
+        <p class="header-subtitle">
+          {{ isEdit
+            ? 'Les familles inscrites sont prévenues automatiquement de la modification.'
+            : 'Proposez un atelier, une balade ou une rencontre aux familles du quartier.' }}
+        </p>
+      </div>
+    </header>
+
+    <form [formGroup]="eventForm" (ngSubmit)="onSubmit()" class="event-form">
+      <!-- 1. Category Selector -->
+      <section class="form-section">
+        <label class="section-title">1. Type d'événement <span class="required">*</span></label>
+        <div class="categories-grid">
+          <button
+            *ngFor="let cat of categoryOptions"
+            type="button"
+            class="cat-option-btn"
+            [class.selected]="eventForm.get('category')?.value === cat.key"
+            (click)="selectCategory(cat.key)"
+          >
+            <div class="cat-icon-wrap">
+              <span class="material-icons-round">{{ cat.icon }}</span>
+            </div>
+            <div class="cat-info">
+              <span class="cat-title">{{ cat.label }}</span>
+              <span class="cat-desc">{{ cat.desc }}</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- 2. Basic Info -->
+      <section class="form-section">
+        <label class="section-title">2. Informations principales</label>
+
+        <div class="form-group">
+          <label for="event-title">Titre de l'événement <span class="required">*</span></label>
+          <input
+            id="event-title"
+            type="text"
+            class="form-control"
+            formControlName="title"
+            placeholder="Ex : Atelier motricité libre et découverte sensorielle"
+            [class.has-error]="eventForm.get('title')?.invalid && eventForm.get('title')?.touched"
+          />
+          <div *ngIf="eventForm.get('title')?.invalid && eventForm.get('title')?.touched" class="form-error">
+            Le titre doit contenir entre 5 et 150 caractères.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="event-desc">Description & déroulement</label>
+          <textarea
+            id="event-desc"
+            rows="5"
+            class="form-control"
+            formControlName="description"
+            placeholder="Déroulement, matériel à prévoir (couverture, chaussettes antidérapantes...), infos pratiques."
+          ></textarea>
+        </div>
+      </section>
+
+      <!-- 3. Date, Time & Capacity -->
+      <section class="form-section">
+        <label class="section-title">3. Date, horaires & capacité</label>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="event-date">Date <span class="required">*</span></label>
+            <input id="event-date" type="date" class="form-control" formControlName="date"
+                   [class.has-error]="hasFormError('startInPast')" />
+          </div>
+
+          <div class="form-group">
+            <label for="start-time">Heure de début <span class="required">*</span></label>
+            <input id="start-time" type="time" class="form-control" formControlName="startTime"
+                   [class.has-error]="hasFormError('startInPast')" />
+          </div>
+
+          <div class="form-group">
+            <label for="end-time">Heure de fin <span class="required">*</span></label>
+            <input id="end-time" type="time" class="form-control" formControlName="endTime"
+                   [class.has-error]="hasFormError('endBeforeStart')" />
+          </div>
+        </div>
+        <div *ngIf="hasFormError('startInPast')" class="form-error">La date de début doit être dans le futur.</div>
+        <div *ngIf="hasFormError('endBeforeStart')" class="form-error">L'heure de fin doit être après l'heure de début.</div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="capacity">Places (familles) <span class="required">*</span></label>
+            <input id="capacity" type="number" min="1" max="10000" class="form-control" formControlName="capacity"
+                   [class.has-error]="eventForm.get('capacity')?.invalid && eventForm.get('capacity')?.touched" />
+            <span class="helper-text">Les inscriptions se ferment automatiquement à ce nombre.</span>
+          </div>
+          <div class="form-group">
+            <label for="min-age">Âge minimum (ans)</label>
+            <input id="min-age" type="number" min="0" max="18" class="form-control" formControlName="minChildAge"
+                   placeholder="ex : 2" [class.has-error]="hasFormError('ageRange')" />
+          </div>
+          <div class="form-group">
+            <label for="max-age">Âge maximum (ans)</label>
+            <input id="max-age" type="number" min="0" max="18" class="form-control" formControlName="maxChildAge"
+                   placeholder="ex : 6" [class.has-error]="hasFormError('ageRange')" />
+          </div>
+        </div>
+        <div *ngIf="hasFormError('ageRange')" class="form-error">L'âge minimum doit être inférieur ou égal à l'âge maximum.</div>
+      </section>
+
+      <!-- 4. Location -->
+      <section class="form-section">
+        <label class="section-title">4. Lieu de rendez-vous</label>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="event-place">Nom du lieu</label>
+            <input id="event-place" type="text" class="form-control" formControlName="locationName"
+                   placeholder="Ex : Parc des Buttes-Chaumont" />
+          </div>
+          <div class="form-group">
+            <label for="event-city">Ville <span class="required">*</span></label>
+            <input id="event-city" type="text" class="form-control" formControlName="city" placeholder="Paris"
+                   [class.has-error]="eventForm.get('city')?.invalid && eventForm.get('city')?.touched" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="event-address">Adresse ou point de repère</label>
+          <input id="event-address" type="text" class="form-control" formControlName="address"
+                 placeholder="Ex : entrée face au métro, 1 rue Botzaris" />
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <div class="form-actions-row">
+        <a [routerLink]="isEdit ? ['/app/events', editId] : ['/app/events']" class="btn btn-secondary">
+          Annuler
+        </a>
+        <button type="submit" class="btn btn-primary btn-submit" [disabled]="eventForm.invalid || isSubmitting">
+          <span class="material-icons-round" *ngIf="!isSubmitting">{{ isEdit ? 'save' : 'celebration' }}</span>
+          <span class="spinner" *ngIf="isSubmitting"></span>
+          <span>{{ isSubmitting ? 'Enregistrement...' : (isEdit ? 'Enregistrer les modifications' : 'Publier l\'événement') }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

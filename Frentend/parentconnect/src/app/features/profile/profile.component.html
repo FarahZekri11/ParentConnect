@@ -1,0 +1,237 @@
+<div class="profile-page page-container">
+  <!-- Profile Header Card with Large Avatar -->
+  <header class="profile-header-card card">
+    <div class="header-banner"></div>
+    <div class="profile-header-content">
+      <div class="avatar-container">
+        <img
+          *ngIf="currentUser?.avatar"
+          [src]="currentUser?.avatar"
+          [alt]="currentUser?.firstName"
+          class="avatar avatar-2xl"
+        />
+        <div *ngIf="!currentUser?.avatar" class="avatar avatar-2xl avatar-initials">
+          {{ getInitials() }}
+        </div>
+      </div>
+
+      <div class="profile-title-area">
+        <div class="name-badge-row">
+          <h1 class="user-fullname">
+            {{ currentUser?.firstName }} {{ currentUser?.lastName }}
+          </h1>
+          <span class="badge badge-accent neighborhood-badge" *ngIf="currentUser?.neighborhood || currentUser?.city">
+            <span class="material-icons-round icon-sm">location_on</span>
+            <span>{{ currentUser?.neighborhood || currentUser?.city }}</span>
+          </span>
+        </div>
+
+        <div class="profile-meta-row">
+          <span class="meta-item">
+            <span class="material-icons-round icon-sm">calendar_month</span>
+            <span>Membre depuis {{ formatJoinedDate(currentUser?.joinedAt) }}</span>
+          </span>
+          <span class="separator">•</span>
+          <span class="meta-item">
+            <span class="material-icons-round icon-sm">badge</span>
+            <span>{{ roleLabel }}</span>
+          </span>
+          <span class="separator" *ngIf="currentUser?.email">•</span>
+          <span class="meta-item" *ngIf="currentUser?.email">
+            <span class="material-icons-round icon-sm">email</span>
+            <span>{{ currentUser?.email }}</span>
+          </span>
+        </div>
+
+        <p class="profile-bio-preview" *ngIf="currentUser?.bio">
+          "{{ currentUser?.bio }}"
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Edit Profile Form -->
+  <section class="profile-edit-section">
+    <div class="card form-card">
+      <div class="card-header">
+        <div class="card-icon-wrap">
+          <span class="material-icons-round">manage_accounts</span>
+        </div>
+        <div>
+          <h2>Modifier mes informations</h2>
+          <p>Mettez à jour vos coordonnées et votre localisation pour trouver les parents à proximité.</p>
+        </div>
+      </div>
+
+      <form [formGroup]="profileForm" (ngSubmit)="onSubmit()" class="profile-form">
+        <!-- Identity Row -->
+        <div class="form-section-title">Identité</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="firstName">Prénom <span class="required">*</span></label>
+            <input
+              id="firstName"
+              type="text"
+              class="form-control"
+              placeholder="Votre prénom"
+              formControlName="firstName"
+              [class.has-error]="profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched"
+            />
+            <span class="form-error" *ngIf="profileForm.get('firstName')?.invalid && profileForm.get('firstName')?.touched">
+              Le prénom est obligatoire.
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="lastName">Nom <span class="required">*</span></label>
+            <input
+              id="lastName"
+              type="text"
+              class="form-control"
+              placeholder="Votre nom de famille"
+              formControlName="lastName"
+              [class.has-error]="profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched"
+            />
+            <span class="form-error" *ngIf="profileForm.get('lastName')?.invalid && profileForm.get('lastName')?.touched">
+              Le nom est obligatoire.
+            </span>
+          </div>
+        </div>
+
+        <!-- Contact Row -->
+        <div class="form-section-title">Coordonnées</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="email">Adresse email <span class="required">*</span></label>
+            <input
+              id="email"
+              type="email"
+              class="form-control"
+              placeholder="exemple@email.com"
+              formControlName="email"
+              readonly
+              title="L'adresse e-mail est l'identifiant de connexion (gérée par Keycloak)"
+              [class.has-error]="profileForm.get('email')?.invalid && profileForm.get('email')?.touched"
+            />
+            <span class="form-error" *ngIf="profileForm.get('email')?.invalid && profileForm.get('email')?.touched">
+              Veuillez saisir une adresse email valide.
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Numéro de téléphone</label>
+            <input
+              id="phone"
+              type="tel"
+              class="form-control"
+              placeholder="+33 6 12 34 56 78"
+              formControlName="phone"
+            />
+            <span class="form-error" *ngIf="profileForm.get('phone')?.invalid && profileForm.get('phone')?.touched">
+              Numéro de téléphone invalide.
+            </span>
+          </div>
+        </div>
+
+        <!-- Location Row -->
+        <div class="form-section-title">Localisation &amp; Quartier</div>
+        <div class="grid-3">
+          <div class="form-group">
+            <label for="city">Ville</label>
+            <input
+              id="city"
+              type="text"
+              class="form-control"
+              placeholder="Paris, Lyon..."
+              formControlName="city"
+              [class.has-error]="profileForm.get('city')?.invalid && profileForm.get('city')?.touched"
+            />
+            <span class="form-error" *ngIf="profileForm.get('city')?.invalid && profileForm.get('city')?.touched">
+              La ville est requise.
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="postalCode">Code Postal</label>
+            <input
+              id="postalCode"
+              type="text"
+              class="form-control"
+              placeholder="75011"
+              formControlName="postalCode"
+              [class.has-error]="profileForm.get('postalCode')?.invalid && profileForm.get('postalCode')?.touched"
+            />
+            <span class="form-error" *ngIf="profileForm.get('postalCode')?.invalid && profileForm.get('postalCode')?.touched">
+              Code postal requis (ex: 75011).
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label for="neighborhood">Quartier</label>
+            <input
+              id="neighborhood"
+              type="text"
+              class="form-control"
+              placeholder="Ex : Oberkampf, Bastille..."
+              formControlName="neighborhood"
+            />
+          </div>
+        </div>
+
+        <!-- Bio -->
+        <div class="form-section-title">Biographie</div>
+        <div class="form-group">
+          <label for="bio">Quelques mots sur vous et votre famille</label>
+          <textarea
+            id="bio"
+            rows="4"
+            class="form-control"
+            placeholder="Présentez-vous aux autres parents du quartier..."
+            formControlName="bio"
+          ></textarea>
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions">
+          <button
+            type="submit"
+            class="btn btn-primary btn-lg save-profile-btn"
+            [disabled]="profileForm.invalid || isSaving"
+          >
+            <span class="material-icons-round" *ngIf="!isSaving">check</span>
+            <span class="material-icons-round spin" *ngIf="isSaving">sync</span>
+            <span>{{ isSaving ? 'Enregistrement...' : 'Enregistrer les modifications' }}</span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Sécurité : changement de mot de passe (vérifié par Keycloak) -->
+      <form class="password-form" (ngSubmit)="changePassword()" autocomplete="off">
+        <div class="form-section-title">Sécurité</div>
+        <div class="grid-3">
+          <div class="form-group">
+            <label for="currentPassword">Mot de passe actuel</label>
+            <input id="currentPassword" type="password" class="form-control" name="current"
+                   [(ngModel)]="passwordForm.current" autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label for="newPassword">Nouveau mot de passe</label>
+            <input id="newPassword" type="password" class="form-control" name="next" minlength="8"
+                   [(ngModel)]="passwordForm.next" autocomplete="new-password" />
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirmation</label>
+            <input id="confirmPassword" type="password" class="form-control" name="confirm"
+                   [(ngModel)]="passwordForm.confirm" autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-secondary" [disabled]="isChangingPassword">
+            <span class="material-icons-round">lock_reset</span>
+            <span>{{ isChangingPassword ? 'Modification...' : 'Changer le mot de passe' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>

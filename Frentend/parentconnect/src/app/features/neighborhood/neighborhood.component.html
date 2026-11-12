@@ -1,0 +1,287 @@
+<div class="neighborhood-page">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow">
+        <span class="material-icons-round icon-sm">shield</span>
+        Positions approximatives uniquement
+      </div>
+      <h1>Mon quartier</h1>
+      <p class="subtitle">
+        Trouvez les événements, annonces et points de rencontre autour de vous. Votre position est floutée par le serveur
+        (~200 m) et n'est partagée qu'avec votre accord.
+      </p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- Panneau de gauche : position, rayon, résultats -->
+    <aside class="side-panel">
+      <section class="card panel-section">
+        <h2><span class="material-icons-round icon-sm">my_location</span> Ma position</h2>
+
+        <p *ngIf="locationLoading" class="muted">Chargement...</p>
+
+        <ng-container *ngIf="!locationLoading">
+          <div *ngIf="currentLocation; else noLocation" class="location-status">
+            <span class="status-dot ok"></span>
+            <div>
+              <strong>Position partagée</strong>
+              <span class="muted">
+                {{ myNeighborhoodName ? 'Quartier : ' + myNeighborhoodName : 'Hors des quartiers enregistrés' }}
+                · précision ~{{ currentLocation.precision_m }} m
+              </span>
+            </div>
+          </div>
+          <ng-template #noLocation>
+            <div class="location-status">
+              <span class="status-dot"></span>
+              <div>
+                <strong>Aucune position partagée</strong>
+                <span class="muted">Vous pouvez explorer une ville sans rien enregistrer.</span>
+              </div>
+            </div>
+          </ng-template>
+
+          <div class="button-row">
+            <button type="button" class="btn btn-primary btn-sm" (click)="shareBrowserLocation()" [disabled]="locating">
+              <span class="material-icons-round icon-sm">gps_fixed</span>
+              {{ locating ? 'Localisation...' : (currentLocation ? 'Mettre à jour' : 'Utiliser ma position') }}
+            </button>
+            <button *ngIf="currentLocation" type="button" class="btn btn-ghost btn-sm danger" (click)="removeLocation()">
+              <span class="material-icons-round icon-sm">location_off</span> Retirer
+            </button>
+          </div>
+        </ng-container>
+
+        <form class="city-search" (ngSubmit)="searchCity()">
+          <label for="cityQuery">Rechercher une ville ou un quartier</label>
+          <div class="input-row">
+            <input id="cityQuery" name="cityQuery" type="text" class="form-control" [(ngModel)]="cityQuery"
+                   placeholder="Ex : La Marsa, Tunis" autocomplete="off" />
+            <button type="submit" class="btn btn-secondary btn-sm" [disabled]="searchingCity || cityQuery.trim().length < 2">
+              <span class="material-icons-round icon-sm">{{ searchingCity ? 'hourglass_top' : 'search' }}</span>
+            </button>
+          </div>
+          <ul *ngIf="cityResults.length" class="city-results">
+            <li *ngFor="let place of cityResults">
+              <button type="button" (click)="chooseCity(place)">{{ place.label }}</button>
+            </li>
+          </ul>
+        </form>
+
+        <div *ngIf="searchCenter" class="center-line">
+          <span class="material-icons-round icon-sm">place</span>
+          Centre : {{ searchCenter.label }}
+          <button *ngIf="searchCenter.label !== 'Ma position approximative'" type="button" class="link-btn"
+                  (click)="shareSearchedPlace()" [disabled]="locating">Enregistrer comme ma position</button>
+        </div>
+      </section>
+
+      <section class="card panel-section">
+        <h2><span class="material-icons-round icon-sm">radar</span> Services à proximité</h2>
+        <div class="radius-chips" role="group" aria-label="Rayon de recherche">
+          <button *ngFor="let km of radiusOptions" type="button" class="chip" [class.active]="radiusKm === km" (click)="setRadius(km)">
+            {{ km }} km
+          </button>
+        </div>
+        <button type="button" class="btn btn-primary full" (click)="findNearby()" [disabled]="searching || !searchCenter">
+          <span class="material-icons-round icon-sm">travel_explore</span>
+          {{ searching ? 'Recherche...' : 'Trouver les services à proximité' }}
+        </button>
+
+        <div *ngIf="hasSearched" class="summary-grid">
+          <div class="summary-item events"><strong>{{ nearbyEvents.length }}</strong><span>événement(s)</span></div>
+          <div class="summary-item listings"><strong>{{ nearbyListings.length }}</strong><span>annonce(s)</span></div>
+          <div class="summary-item points"><strong>{{ nearbyMeetingPoints.length }}</strong><span>point(s) de rencontre</span></div>
+          <div class="summary-item parents"><strong>{{ nearbyParents.length }}</strong><span>parent(s)</span></div>
+        </div>
+        <p *ngIf="hasSearched && !currentLocation" class="muted small">
+          Les parents à proximité ne sont visibles que si vous partagez vous-même votre position.
+        </p>
+      </section>
+
+      <section class="card panel-section legend">
+        <span><i class="dot events"></i> Événements</span>
+        <span><i class="dot listings"></i> Annonces</span>
+        <span><i class="dot points"></i> Points de rencontre</span>
+        <span><i class="dot me"></i> Ma zone (~200 m)</span>
+      </section>
+    </aside>
+
+    <!-- Carte OpenStreetMap -->
+    <section class="map-card card">
+      <div #mapEl class="map" [class.picking]="pickingPoint" aria-label="Carte du quartier"></div>
+      <div *ngIf="pickingPoint" class="picking-banner">
+        <span class="material-icons-round icon-sm">touch_app</span> Cliquez sur la carte pour placer le point de rencontre
+      </div>
+    </section>
+  </div>
+
+  <!-- Onglets -->
+  <nav class="tabs">
+    <button type="button" [class.active]="activeTab === 'services'" (click)="activeTab = 'services'">
+      <span class="material-icons-round icon-sm">near_me</span> Résultats
+    </button>
+    <button type="button" [class.active]="activeTab === 'meeting-points'" (click)="activeTab = 'meeting-points'">
+      <span class="material-icons-round icon-sm">park</span> Points de rencontre ({{ meetingPoints.length }})
+    </button>
+    <button type="button" [class.active]="activeTab === 'circles'" (click)="activeTab = 'circles'">
+      <span class="material-icons-round icon-sm">diversity_3</span> Cercles de confiance
+    </button>
+    <button type="button" [class.active]="activeTab === 'verification'" (click)="activeTab = 'verification'">
+      <span class="material-icons-round icon-sm">verified</span> Vérification d'adresse
+    </button>
+  </nav>
+
+  <!-- Résultats -->
+  <section *ngIf="activeTab === 'services'" class="tab-content">
+    <p *ngIf="!hasSearched" class="card empty">Choisissez un centre et un rayon, puis lancez la recherche.</p>
+    <div *ngIf="hasSearched" class="results-grid">
+      <div class="card result-col">
+        <h3><i class="dot events"></i> Événements ({{ nearbyEvents.length }})</h3>
+        <p *ngIf="!nearbyEvents.length" class="muted">Aucun événement localisé dans ce rayon.</p>
+        <div *ngFor="let e of nearbyEvents" class="result-row">
+          <div>
+            <a [routerLink]="e.link">{{ e.title }}</a>
+            <span class="muted">{{ e.subtitle }}</span>
+          </div>
+          <button type="button" class="distance" (click)="focus(e.lat, e.lng)">{{ formatKm(e.distanceKm) }}</button>
+        </div>
+      </div>
+      <div class="card result-col">
+        <h3><i class="dot listings"></i> Annonces ({{ nearbyListings.length }})</h3>
+        <p *ngIf="!nearbyListings.length" class="muted">Aucune annonce localisée dans ce rayon.</p>
+        <div *ngFor="let l of nearbyListings" class="result-row">
+          <div>
+            <a [routerLink]="l.link">{{ l.title }}</a>
+            <span class="muted">{{ l.subtitle }}</span>
+          </div>
+          <button type="button" class="distance" (click)="focus(l.lat, l.lng)">{{ formatKm(l.distanceKm) }}</button>
+        </div>
+      </div>
+      <div class="card result-col">
+        <h3><i class="dot points"></i> Points de rencontre ({{ nearbyMeetingPoints.length }})</h3>
+        <p *ngIf="!nearbyMeetingPoints.length" class="muted">Aucun point de rencontre dans ce rayon.</p>
+        <div *ngFor="let p of nearbyMeetingPoints" class="result-row">
+          <div>
+            <strong>{{ p.name }}</strong>
+            <span class="muted">{{ typeLabel(p.type) }} · {{ neighborhoodName(p.neighborhood_id) }}</span>
+          </div>
+          <button type="button" class="distance" (click)="focus(p.location.coordinates[1], p.location.coordinates[0])">
+            <span class="material-icons-round icon-sm">place</span>
+          </button>
+        </div>
+      </div>
+      <div class="card result-col">
+        <h3><i class="dot parents"></i> Parents à proximité ({{ nearbyParents.length }})</h3>
+        <p class="muted small">Identités masquées, distances arrondies à 100 m.</p>
+        <p *ngIf="!nearbyParents.length" class="muted">Aucun parent n'a partagé de position dans ce rayon.</p>
+        <div *ngFor="let p of nearbyParents" class="result-row">
+          <div>
+            <strong>{{ p.displayName }}</strong>
+            <span class="muted">à ~{{ formatKm(p.distance_m / 1000) }}</span>
+          </div>
+          <div class="row-actions">
+            <span *ngIf="p.trustLevel === 'close'" class="badge">Cercle proche</span>
+            <span *ngIf="p.trustLevel === 'neighborhood'" class="badge">Cercle quartier</span>
+            <button *ngIf="p.trustLevel === 'none'" type="button" class="link-btn" (click)="addToCircle(p, 'neighborhood')">+ Cercle quartier</button>
+            <button *ngIf="p.trustLevel !== 'close'" type="button" class="link-btn" (click)="addToCircle(p, 'close')">+ Cercle proche</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Points de rencontre -->
+  <section *ngIf="activeTab === 'meeting-points'" class="tab-content">
+    <div *ngIf="isAdmin" class="card admin-box">
+      <div class="admin-head">
+        <h3><span class="material-icons-round icon-sm">admin_panel_settings</span> Gestion (administrateur)</h3>
+        <button *ngIf="!pickingPoint" type="button" class="btn btn-primary btn-sm" (click)="startPicking()" [disabled]="!neighborhoods.length">
+          <span class="material-icons-round icon-sm">add_location_alt</span> Ajouter un point
+        </button>
+      </div>
+      <p *ngIf="!neighborhoods.length" class="muted">Créez d'abord un quartier (ci-dessous).</p>
+
+      <form *ngIf="pickingPoint" class="point-form" (ngSubmit)="savePoint()">
+        <input name="pname" type="text" class="form-control" placeholder="Nom du lieu" [(ngModel)]="pointForm.name" maxlength="120" />
+        <select name="ptype" class="form-control" [(ngModel)]="pointForm.type">
+          <option *ngFor="let t of meetingPointTypes" [ngValue]="t.value">{{ t.label }}</option>
+        </select>
+        <select name="pnh" class="form-control" [(ngModel)]="pointForm.neighborhoodId">
+          <option *ngFor="let nh of neighborhoods" [ngValue]="nh.id">{{ nh.name }} ({{ nh.city }})</option>
+        </select>
+        <span class="muted small">{{ pointForm.lat !== null ? 'Emplacement : ' + pointForm.lat + ', ' + pointForm.lng : 'Cliquez sur la carte' }}</span>
+        <div class="button-row">
+          <button type="submit" class="btn btn-primary btn-sm" [disabled]="savingPoint">{{ pointForm.id ? 'Enregistrer' : 'Ajouter' }}</button>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="cancelPicking()">Annuler</button>
+        </div>
+      </form>
+
+      <div class="nh-admin">
+        <h4>Quartiers ({{ neighborhoods.length }})</h4>
+        <div *ngFor="let nh of neighborhoods" class="result-row">
+          <div><strong>{{ nh.name }}</strong> <span class="muted">{{ nh.city }}</span></div>
+          <button type="button" class="link-btn danger" (click)="deleteNeighborhood(nh)">Supprimer</button>
+        </div>
+        <form class="point-form" (ngSubmit)="createNeighborhoodHere()">
+          <input name="nhname" type="text" class="form-control" placeholder="Nom du quartier" [(ngModel)]="newNeighborhood.name" maxlength="100" />
+          <input name="nhcity" type="text" class="form-control" placeholder="Ville" [(ngModel)]="newNeighborhood.city" maxlength="100" />
+          <button type="submit" class="btn btn-secondary btn-sm" [disabled]="!searchCenter">Créer autour du centre (~2 km)</button>
+        </form>
+      </div>
+    </div>
+
+    <p *ngIf="!meetingPoints.length" class="card empty">Aucun point de rencontre enregistré pour le moment.</p>
+    <div class="points-grid">
+      <div *ngFor="let p of meetingPoints" class="card point-card">
+        <span class="material-icons-round point-icon">{{ typeIcon(p.type) }}</span>
+        <div class="point-body">
+          <strong>{{ p.name }}</strong>
+          <span class="muted">{{ typeLabel(p.type) }} · {{ neighborhoodName(p.neighborhood_id) }}</span>
+        </div>
+        <div class="row-actions">
+          <button type="button" class="link-btn" (click)="focus(p.location.coordinates[1], p.location.coordinates[0])">Voir</button>
+          <button *ngIf="isAdmin" type="button" class="link-btn" (click)="startPicking(p)">Modifier</button>
+          <button *ngIf="isAdmin" type="button" class="link-btn danger" (click)="deletePoint(p)">Supprimer</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Cercles de confiance -->
+  <section *ngIf="activeTab === 'circles'" class="tab-content">
+    <p class="muted">Ajoutez des parents à vos cercles depuis la liste « Parents à proximité ».</p>
+    <div class="results-grid two">
+      <div *ngFor="let level of ['close', 'neighborhood']" class="card result-col">
+        <h3>{{ level === 'close' ? 'Cercle proche' : 'Cercle quartier' }} ({{ getCircle($any(level))?.members?.length || 0 }})</h3>
+        <p *ngIf="!getCircle($any(level))?.members?.length" class="muted">Aucun membre.</p>
+        <div *ngFor="let m of getCircle($any(level))?.members" class="result-row">
+          <span>{{ memberLabel(m) }}</span>
+          <button type="button" class="link-btn danger" (click)="removeFromCircle($any(level), m)">Retirer</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vérification d'adresse -->
+  <section *ngIf="activeTab === 'verification'" class="tab-content">
+    <div class="card verification">
+      <span class="material-icons-round verif-icon">{{ myVerification?.status === 'verified' ? 'verified' : 'pending' }}</span>
+      <div>
+        <h3>Vérification par les voisins</h3>
+        <p *ngIf="!myVerification" class="muted">
+          Demandez à deux parents de votre quartier de confirmer que vous y habitez (une position partagée est nécessaire).
+        </p>
+        <p *ngIf="myVerification" class="muted">
+          Statut : <strong>{{ myVerification.status === 'verified' ? 'adresse vérifiée' : (myVerification.status === 'rejected' ? 'refusée' : 'en attente') }}</strong>
+          · {{ myVerification.validated_by.length || 0 }}/{{ myVerification.required_validations || 2 }} validation(s)
+        </p>
+        <button *ngIf="!myVerification || myVerification.status === 'rejected'" type="button" class="btn btn-primary btn-sm"
+                (click)="requestVerification()" [disabled]="!currentLocation">
+          Demander la vérification
+        </button>
+      </div>
+    </div>
+  </section>
+</div>

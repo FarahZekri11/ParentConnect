@@ -1,0 +1,20 @@
+# Participation Service — réglages centralisés (modifiables sans reconstruire l'image : redémarrage du service).
+# Les variables d'environnement historiques (${...}) restent prioritaires si elles sont définies.
+info:
+  config:
+    service: participation-service
+
+clients:
+  event-service:
+    # Client OpenFeign vers Event Service : délais et nouvelles tentatives (opérations idempotentes)
+    connect-timeout: ${EVENT_SERVICE_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${EVENT_SERVICE_READ_TIMEOUT:PT5S}
+    max-attempts: ${EVENT_SERVICE_MAX_ATTEMPTS:3}
+    initial-backoff: ${EVENT_SERVICE_INITIAL_BACKOFF:PT0.2S}
+
+app:
+  reconciliation:
+    # Libération des places réservées sans participation confirmée (compensation)
+    interval: ${RECONCILIATION_INTERVAL:PT5M}
+    grace-seconds: ${RECONCILIATION_GRACE_SECONDS:120}
+    batch-size: 200

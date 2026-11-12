@@ -1,0 +1,11 @@
+# =====================================================================
+# Configuration commune à tous les services clients du Config Server
+# (Spring Cloud Config Server, profil « native », dossier Backend/config-repo).
+# AUCUN SECRET ICI : mots de passe, clés et jetons restent dans le .env (variables d'environnement).
+# Priorité : variables d'environnement > ce dépôt > application.yml embarqué dans chaque service.
+# =====================================================================
+info:
+  config:
+    # Visible sur GET /actuator/info : prouve que la configuration vient bien du Config Server
+    source: config-server (Backend/config-repo)
+  platform: ParentConnect

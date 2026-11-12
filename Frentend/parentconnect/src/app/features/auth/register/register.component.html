@@ -1,0 +1,145 @@
+<div class="auth-page">
+  <aside class="auth-aside">
+    <video #authVideo
+           autoplay
+           [muted]="true"
+           muted="muted"
+           loop
+           playsinline
+           preload="auto"
+           class="auth-video-bg">
+      <source src="video.mp4" type="video/mp4">
+    </video>
+    <div class="auth-video-overlay"></div>
+
+    <div class="aside-top">
+      <a routerLink="/" class="aside-brand">
+        <img src="/logo2.png" alt="" class="aside-brand-logo" />
+        <span class="aside-brand-name">ParentConnect</span>
+      </a>
+    </div>
+
+    <div class="aside-copy">
+      <span class="aside-eyebrow">Bienvenue chez vous</span>
+      <blockquote>« Le meilleur réseau de garde, c'est encore celui des parents d'à côté. »</blockquote>
+      <div class="aside-stats">
+        <div class="aside-stat">
+          <span class="aside-stat-value">98%</span>
+          <span class="aside-stat-label">Satisfaction</span>
+        </div>
+        <div class="aside-stat">
+          <span class="aside-stat-value">1 min</span>
+          <span class="aside-stat-label">Pour s'inscrire</span>
+        </div>
+        <div class="aside-stat">
+          <span class="aside-stat-value">0 €</span>
+          <span class="aside-stat-label">Sans engagement</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="aside-foot">
+      <span>Paris 11e · Oberkampf</span>
+      <span>Entraide locale</span>
+    </div>
+  </aside>
+
+  <main class="auth-main">
+    <div class="auth-panel auth-panel--wide">
+      <a routerLink="/auth/login" class="back-link">
+        <span class="material-icons-round icon-sm" aria-hidden="true">arrow_back</span> J'ai déjà un compte
+      </a>
+
+      <div class="auth-mobile-brand">
+        <img src="/logo2.png" alt="ParentConnect" />
+        <span>ParentConnect</span>
+      </div>
+
+      <div class="auth-head">
+        <span class="eyebrow">Inscription</span>
+        <h1>Rejoignez le quartier.</h1>
+        <p>Quelques informations suffisent pour rencontrer les familles près de chez vous.</p>
+      </div>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
+        <div class="form-group">
+          <label>Je m'inscris en tant que</label>
+          <div class="role-choice" role="radiogroup" aria-label="Type de compte">
+            <label class="role-option" [class.selected]="form.get('role')?.value === 'PARENT'">
+              <input type="radio" formControlName="role" value="PARENT" />
+              <span class="material-icons-round">family_restroom</span>
+              <span class="role-title">Parent</span>
+              <span class="role-desc">Je cherche une garde, des événements, du matériel</span>
+            </label>
+            <label class="role-option" [class.selected]="form.get('role')?.value === 'BABYSITTER'">
+              <input type="radio" formControlName="role" value="BABYSITTER" />
+              <span class="material-icons-round">child_care</span>
+              <span class="role-title">Babysitter</span>
+              <span class="role-desc">Je propose mes disponibilités et je garde des enfants</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="firstName">Prénom</label>
+            <input id="firstName" type="text" formControlName="firstName" class="form-control"
+                   placeholder="Votre prénom" autocomplete="given-name"
+                   [class.has-error]="form.get('firstName')?.invalid && form.get('firstName')?.touched" />
+            <span *ngIf="form.get('firstName')?.invalid && form.get('firstName')?.touched" class="form-error">Le prénom est requis.</span>
+          </div>
+          <div class="form-group">
+            <label for="lastName">Nom</label>
+            <input id="lastName" type="text" formControlName="lastName" class="form-control"
+                   placeholder="Votre nom" autocomplete="family-name"
+                   [class.has-error]="form.get('lastName')?.invalid && form.get('lastName')?.touched" />
+            <span *ngIf="form.get('lastName')?.invalid && form.get('lastName')?.touched" class="form-error">Le nom est requis.</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="registerEmail">Adresse email</label>
+          <input id="registerEmail" type="email" formControlName="email" class="form-control"
+                 placeholder="votre@email.com" autocomplete="email"
+                 [class.has-error]="form.get('email')?.invalid && form.get('email')?.touched" />
+          <span *ngIf="form.get('email')?.invalid && form.get('email')?.touched" class="form-error">Adresse email invalide.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="registerPassword">Mot de passe</label>
+          <input id="registerPassword" type="password" formControlName="password" class="form-control"
+                 placeholder="Minimum 8 caractères" autocomplete="new-password"
+                 [class.has-error]="form.get('password')?.invalid && form.get('password')?.touched" />
+          <span *ngIf="form.get('password')?.invalid && form.get('password')?.touched" class="form-error">Mot de passe requis (min. 8 caractères).</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="city">Ville <span class="text-muted">(optionnel)</span></label>
+            <input id="city" type="text" formControlName="city" class="form-control" placeholder="Paris" autocomplete="address-level2" />
+          </div>
+          <div class="form-group">
+            <label for="postalCode">Code postal <span class="text-muted">(optionnel)</span></label>
+            <input id="postalCode" type="text" formControlName="postalCode" class="form-control" placeholder="75001" autocomplete="postal-code" />
+          </div>
+        </div>
+
+        <div class="form-check">
+          <input type="checkbox" formControlName="acceptTerms" id="terms" />
+          <label for="terms">J'accepte les <a href="#">conditions d'utilisation</a> et la charte de bienveillance.</label>
+        </div>
+        <span *ngIf="form.get('acceptTerms')?.invalid && form.get('acceptTerms')?.touched" class="form-error">Vous devez accepter les conditions d'utilisation.</span>
+
+        <button type="submit" class="btn btn-primary w-full auth-submit" [disabled]="loading">
+          <span *ngIf="loading" class="spinner" aria-hidden="true"></span>
+          <span *ngIf="!loading">Créer mon compte</span>
+        </button>
+      </form>
+
+      <p class="auth-footer-text">
+        Déjà un compte ?
+        <a routerLink="/auth/login">Se connecter</a>
+      </p>
+    </div>
+  </main>
+</div>

@@ -1,0 +1,108 @@
+<div class="new-request-page">
+  <div class="top-nav">
+    <a routerLink="/app/babysitting" class="back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour aux demandes de garde
+    </a>
+  </div>
+
+  <div class="page-title-block">
+    <h1>{{ editId ? 'Modifier ma demande de garde' : 'Demander une garde' }}</h1>
+    <p class="subtitle">Un babysitter du quartier disponible pourra vous proposer de garder vos enfants.
+      Les heures de garde sont comptabilisées une fois la garde terminée.</p>
+  </div>
+
+  <!-- Formulaire -->
+  <div *ngIf="!created" class="request-grid">
+    <form class="form-container card" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="form-group">
+        <label for="date">Date <span class="required">*</span></label>
+        <input id="date" type="date" class="form-control" formControlName="date" [class.has-error]="hasError('pastDate')" />
+        <div *ngIf="hasError('pastDate')" class="form-error">La date doit être aujourd'hui ou plus tard.</div>
+      </div>
+
+      <div class="times-row">
+        <div class="form-group">
+          <label for="start">Début <span class="required">*</span></label>
+          <input id="start" type="time" class="form-control" formControlName="startTime" />
+        </div>
+        <div class="form-group">
+          <label for="end">Fin <span class="required">*</span></label>
+          <input id="end" type="time" class="form-control" formControlName="endTime" [class.has-error]="hasError('endBeforeStart')" />
+        </div>
+      </div>
+      <div *ngIf="hasError('endBeforeStart')" class="form-error">L'heure de fin doit être après l'heure de début.</div>
+
+      <div class="form-group">
+        <label for="neighborhood">Quartier <span class="required">*</span></label>
+        <input id="neighborhood" type="text" class="form-control" formControlName="neighborhood" placeholder="Ex : Montmartre"
+               [class.has-error]="form.get('neighborhood')?.invalid && form.get('neighborhood')?.touched" />
+      </div>
+
+      <div class="children-section">
+        <label>Enfants à garder (tranche d'âge, pas de nom) <span class="required">*</span></label>
+        <div formArrayName="children" class="children-list">
+          <div *ngFor="let child of children.controls; let i = index" class="child-row">
+            <span class="child-label">Enfant {{ i + 1 }}</span>
+            <select class="form-control" [formControlName]="i">
+              <option *ngFor="let a of ageRanges" [value]="a">{{ a }} ans</option>
+            </select>
+            <button *ngIf="children.length > 1" type="button" class="btn btn-ghost btn-sm" (click)="removeChild(i)" aria-label="Retirer">
+              <span class="material-icons-round icon-sm">close</span>
+            </button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="addChild()" [disabled]="children.length >= 10">
+          <span class="material-icons-round icon-sm">add</span> Ajouter un enfant
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Informations utiles (facultatif)</label>
+        <textarea id="notes" rows="3" class="form-control" formControlName="notes" maxlength="500"
+                  placeholder="Habitudes du coucher, allergies, digicode..."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-submit" [disabled]="form.invalid || submitting">
+        <span class="material-icons-round">send</span>
+        {{ submitting ? 'Enregistrement...' : (editId ? 'Enregistrer les modifications' : 'Publier ma demande') }}
+      </button>
+    </form>
+
+    <aside class="summary-container">
+      <div class="summary-card card">
+        <h3>Récapitulatif</h3>
+        <p><strong>{{ hours | number:'1.0-1':'fr' }} h</strong> de garde · {{ children.length }} enfant(s)</p>
+        <p class="summary-note">{{ hours | number:'1.0-1':'fr' }} heure(s) seront comptabilisées à la fin de la garde.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Demande publiée : parents compatibles -->
+  <div *ngIf="created" class="card created-card">
+    <div class="created-header">
+      <span class="material-icons-round created-icon">check_circle</span>
+      <div>
+        <h2>Demande publiée</h2>
+        <p>{{ created.date | date:'EEEE d MMMM':'':'fr' }} · {{ created.startTime }}–{{ created.endTime }} · {{ created.neighborhood }}</p>
+      </div>
+    </div>
+
+    <h3 class="matches-title">Babysitters disponibles compatibles</h3>
+    <p *ngIf="loadingMatches">Recherche des babysitters disponibles...</p>
+    <p *ngIf="!loadingMatches && matches.length === 0" class="summary-note">
+      Aucun babysitter n'a encore déclaré de disponibilité compatible. Votre demande est visible par tout le quartier :
+      vous serez notifié dès qu'un babysitter proposera son aide.
+    </p>
+    <div *ngFor="let m of matches" class="match-row">
+      <span class="material-icons-round">person_pin_circle</span>
+      <span class="match-text">Un babysitter de <strong>{{ m.neighborhood }}</strong> · disponible {{ m.startTime }}–{{ m.endTime }}</span>
+      <span class="match-score">Compatibilité {{ m.score }} %</span>
+    </div>
+
+    <div class="created-actions">
+      <a routerLink="/app/babysitting/my-bookings" class="btn btn-primary">Suivre mes gardes</a>
+      <a routerLink="/app/babysitting" class="btn btn-secondary">Retour aux demandes</a>
+    </div>
+  </div>
+</div>

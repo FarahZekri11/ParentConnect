@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  comment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: parentconnect/comment-service:local-test
+    container_name: parentconnect-comment-test
+    restart: unless-stopped
+    ports:
+      - "8002:8080"
+    environment:
+      APP_NAME: "Comment Service (Local Test)"
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8002
+      APP_PORT: 8080
+      PORT: 8080
+      DB_CONNECTION: pgsql
+      DB_HOST: comment-db-test
+      DB_PORT: 5432
+      DB_DATABASE: comment_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: password123
+      AUTO_MIGRATE: "true"
+      AUTO_SEED: "false"
+      L5_SWAGGER_GENERATE_ALWAYS: "true"
+      EUREKA_SERVER_URL: ""
+      KEYCLOAK_REALM_PUBLIC_KEY: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtZSLiienoTTcqkodQZdR6kwofXkQx47shJ4tSkoA1Q7RLTXXAcS/rr0Xmiyhv0UZlXdjQFB2NZu978UIIL7hRSZCXz/SOCHVRPHuFXB1qV3IAJrEUc+hye7+24/VUdVm0BQTkFoiSkBHuaq7zhEszT1wWL602BrNUnyUzIYo/uYOpd54/OnMtgyrPHnWczB3OA3VC8hLEW4kDdik5vIxr7B+xytTD+cmo/zhHv2F9W0fjperQWANK33jFRtd+BHpQgZNuiWfh8JqaWvZGTs7RvVj6drJZRHTgSQuoyqJ51Mxr3wTUWKHLl5BqtYb0YJvYr20wR6byXOUIRfAzeNrOwIDAQAB
+      KEYCLOAK_REALM: parentconnect
+      KEYCLOAK_AUTH_SERVER_URL: http://localhost:8180
+      JWT_SECRET: super_secret_parentconnect_jwt_key_2026_community
+    depends_on:
+      comment-db-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - comment-local-net
+
+  comment-db-test:
+    image: postgres:16-alpine
+    container_name: parentconnect-comment-db-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: comment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "54322:5432"
+    volumes:
+      - comment_test_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d comment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - comment-local-net
+
+volumes:
+  comment_test_db_data:
+
+networks:
+  comment-local-net:
+    driver: bridge

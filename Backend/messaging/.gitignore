@@ -1,0 +1,24 @@
+# Binaires et exécutables
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Fichiers de configuration locale et secrets
+.env
+*.local.env
+
+# Fichiers temporaires de test et couverture
+*.out
+*.test
+coverage.html
+
+# IDE et OS
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db

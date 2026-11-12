@@ -1,0 +1,285 @@
+# =====================================================================
+# ParentConnect — API Gateway centralisée (Spring Cloud Gateway)
+#
+# Point d'entrée UNIQUE du frontend : http://localhost:8080
+# - Valide les JWT Keycloak (RS256, émetteur vérifié)
+# - Retire les en-têtes d'identité envoyés par les clients, puis injecte des en-têtes de confiance
+#   (X-Gateway-Auth, X-User-Id = sub, X-User-Role = rôle métier principal, X-User-Roles = liste)
+# - Transmet l'en-tête Authorization aux microservices
+# - Route via Eureka (lb://NOM-EUREKA). L'ORDRE COMPTE : les routes spécifiques passent avant les génériques.
+# =====================================================================
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Clés de signature lues à l'intérieur du réseau Docker
+          jwk-set-uri: ${KEYCLOAK_JWKS_URI:http://keycloak:8180/realms/parentconnect/protocol/openid-connect/certs}
+          # Émetteur attendu = URL publique de Keycloak (KC_HOSTNAME_URL), identique pour tous les clients
+          issuer-uri: ${KEYCLOAK_ISSUER:http://localhost:8180/realms/parentconnect}
+
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          # Pas de routes automatiques /NOM-SERVICE/** : seules les routes déclarées ci-dessous sont exposées
+          enabled: false
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+      # Quand un service est recréé (docker compose up --build), il change d'adresse IP et Docker peut
+      # réattribuer l'ancienne IP à un autre conteneur : les connexions réutilisées ne doivent pas vivre longtemps.
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+        pool:
+          max-idle-time: 10s
+          max-life-time: 60s
+      routes:
+        # ---------------------------------------------------------------
+        # 0. Endpoints interservices : jamais exposés à l'extérieur
+        # ---------------------------------------------------------------
+        - id: block-internal
+          uri: no://op
+          order: -100
+          predicates:
+            - Path=/internal/**,/api/internal/**
+          filters:
+            - SetStatus=404
+
+        # ---------------------------------------------------------------
+        # 1. Module Événements (Eya) — Participation AVANT Event (même préfixe /api/events)
+        # ---------------------------------------------------------------
+        - id: participation-service
+          uri: lb://PARENTCONNECT-PARTICIPATION-SERVICE
+          order: 10
+          predicates:
+            - Path=/api/events/*/join,/api/events/*/leave,/api/events/*/participants,/api/events/me/joined,/api/admin/participations/**
+        - id: event-service
+          uri: lb://PARENTCONNECT-EVENT-SERVICE
+          order: 11
+          predicates:
+            - Path=/api/events,/api/events/**
+
+        # ---------------------------------------------------------------
+        # 2. Module Communauté (Feriel) — Report et Comment AVANT Post (même préfixe /api/posts)
+        # ---------------------------------------------------------------
+        - id: report-service
+          uri: lb://PARENTCONNECT-REPORT
+          order: 20
+          predicates:
+            - Path=/api/posts/*/report,/api/comments/*/report,/api/admin/reports,/api/admin/reports/**
+        - id: comment-service
+          uri: lb://PARENTCONNECT-COMMENT
+          order: 21
+          predicates:
+            - Path=/api/posts/*/comments,/api/comments/**
+        - id: post-service
+          uri: lb://PARENTCONNECT-POST
+          order: 22
+          predicates:
+            - Path=/api/posts,/api/posts/**
+        - id: category-service
+          uri: lb://PARENTCONNECT-CATEGORY
+          order: 23
+          predicates:
+            - Path=/api/categories,/api/categories/**
+
+        # ---------------------------------------------------------------
+        # 3. Module Babysitting
+        # ---------------------------------------------------------------
+        - id: babysitting-service
+          uri: lb://PARENTCONNECT-BABYSITTING
+          order: 30
+          predicates:
+            - Path=/api/babysitting/**
+
+        # ---------------------------------------------------------------
+        # 4. Module Marketplace (Farah)
+        # ---------------------------------------------------------------
+        - id: marketplace-service
+          uri: lb://MARKETPLACE-SERVICE
+          order: 40
+          predicates:
+            - Path=/api/listings,/api/listings/**
+
+        # ---------------------------------------------------------------
+        # 5. Module Messagerie (Ameni) — REST + WebSocket
+        # ---------------------------------------------------------------
+        - id: messaging-websocket
+          uri: lb:ws://MESSAGING-SERVICE
+          order: 50
+          predicates:
+            - Path=/ws
+        - id: messaging-service
+          uri: lb://MESSAGING-SERVICE
+          order: 51
+          predicates:
+            - Path=/api/conversations,/api/conversations/**,/api/messages,/api/messages/**,/api/notifications,/api/notifications/**
+
+        # ---------------------------------------------------------------
+        # 6. Module Géolocalisation & Quartiers (Tasnime)
+        # ---------------------------------------------------------------
+        - id: geo-service
+          uri: lb://PARENTCONNECT-GEO-SERVICE
+          order: 60
+          predicates:
+            - Path=/api/geo,/api/geo/**
+
+        # ---------------------------------------------------------------
+        # Documentation OpenAPI de chaque microservice, regroupée dans le Swagger UI de la Gateway
+        # (http://localhost:8080/swagger-ui.html). Lecture seule, sans jeton.
+        # ---------------------------------------------------------------
+        - id: docs-events
+          uri: lb://PARENTCONNECT-EVENT-SERVICE
+          order: 5
+          predicates:
+            - Path=/docs/events
+            - Method=GET
+          filters:
+            - SetPath=/v3/api-docs
+        - id: docs-participations
+          uri: lb://PARENTCONNECT-PARTICIPATION-SERVICE
+          order: 5
+          predicates:
+            - Path=/docs/participations
+            - Method=GET
+          filters:
+            - SetPath=/v3/api-docs
+        - id: docs-posts
+          uri: lb://PARENTCONNECT-POST
+          order: 5
+          predicates:
+            - Path=/docs/posts
+            - Method=GET
+          filters:
+            - SetPath=/docs
+        - id: docs-comments
+          uri: lb://PARENTCONNECT-COMMENT
+          order: 5
+          predicates:
+            - Path=/docs/comments
+            - Method=GET
+          filters:
+            - SetPath=/docs
+        - id: docs-categories
+          uri: lb://PARENTCONNECT-CATEGORY
+          order: 5
+          predicates:
+            - Path=/docs/categories
+            - Method=GET
+          filters:
+            - SetPath=/docs
+        - id: docs-reports
+          uri: lb://PARENTCONNECT-REPORT
+          order: 5
+          predicates:
+            - Path=/docs/reports
+            - Method=GET
+          filters:
+            - SetPath=/docs
+        - id: docs-babysitting
+          uri: lb://PARENTCONNECT-BABYSITTING
+          order: 5
+          predicates:
+            - Path=/docs/babysitting
+            - Method=GET
+          filters:
+            - SetPath=/openapi.json
+        - id: docs-marketplace
+          uri: lb://MARKETPLACE-SERVICE
+          order: 5
+          predicates:
+            - Path=/docs/marketplace
+            - Method=GET
+          filters:
+            - SetPath=/api/docs-json
+        - id: docs-messaging
+          uri: lb://MESSAGING-SERVICE
+          order: 5
+          predicates:
+            - Path=/docs/messaging
+            - Method=GET
+          filters:
+            - SetPath=/swagger/doc.json
+        - id: docs-geo
+          uri: lb://PARENTCONNECT-GEO-SERVICE
+          order: 5
+          predicates:
+            - Path=/docs/geo
+            - Method=GET
+          filters:
+            - SetPath=/api/geo/openapi.json
+
+        # ---------------------------------------------------------------
+        # Tableau de bord Eureka (démonstration)
+        # ---------------------------------------------------------------
+        - id: eureka-dashboard
+          uri: ${EUREKA_DASHBOARD_URI:http://eureka-server:8761}
+          order: 90
+          predicates:
+            - Path=/eureka/**
+
+# Swagger UI centralisé : documentation de la Gateway (inscription, compte, administration) + chaque service
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    urls-primary-name: API Gateway
+    urls:
+      - name: API Gateway
+        url: /v3/api-docs
+      - name: Événements
+        url: /docs/events
+      - name: Participations
+        url: /docs/participations
+      - name: Babysitting
+        url: /docs/babysitting
+      - name: Marketplace
+        url: /docs/marketplace
+      - name: Messagerie
+        url: /docs/messaging
+      - name: Géolocalisation
+        url: /docs/geo
+      - name: Communauté - Publications
+        url: /docs/posts
+      - name: Communauté - Commentaires
+        url: /docs/comments
+      - name: Communauté - Catégories
+        url: /docs/categories
+      - name: Communauté - Signalements
+        url: /docs/reports
+
+# Inscription des nouveaux parents (POST /api/auth/register) : client confidentiel Keycloak
+registration:
+  keycloak-url: ${KEYCLOAK_INTERNAL_URL:http://keycloak:8180}
+  realm: ${KEYCLOAK_REALM:parentconnect}
+  client-id: parentconnect-registration
+  client-secret: ${KC_REGISTRATION_CLIENT_SECRET:}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.parentconnect.gateway: INFO

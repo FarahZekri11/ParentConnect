@@ -1,0 +1,182 @@
+<div class="my-listings-page page-container">
+  <!-- Top Navigation & Header -->
+  <div class="top-nav-bar">
+    <a routerLink="/app/marketplace" class="btn btn-ghost btn-sm back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour à la Marketplace
+    </a>
+  </div>
+
+  <div class="page-header my-listings-header">
+    <div class="header-titles">
+      <h1>Mes annonces</h1>
+      <p>Gérez et mettez à jour les articles que vous proposez aux parents du quartier.</p>
+    </div>
+    <a routerLink="/app/marketplace/new" class="btn btn-primary publish-btn">
+      <span class="material-icons-round icon-md">add_circle</span>
+      Créer une annonce
+    </a>
+  </div>
+
+  <!-- Status Tabs -->
+  <div class="status-tabs-row">
+    <button
+      type="button"
+      class="chip tab-btn"
+      [class.active]="selectedFilter === 'ALL'"
+      (click)="setFilter('ALL')"
+    >
+      Toutes ({{ listings.length }})
+    </button>
+    <button
+      type="button"
+      class="chip tab-btn"
+      [class.active]="selectedFilter === 'AVAILABLE'"
+      (click)="setFilter('AVAILABLE')"
+    >
+      Disponibles
+    </button>
+    <button
+      type="button"
+      class="chip tab-btn"
+      [class.active]="selectedFilter === 'BORROWED'"
+      (click)="setFilter('BORROWED')"
+    >
+      En cours de prêt
+    </button>
+    <button
+      type="button"
+      class="chip tab-btn"
+      [class.active]="selectedFilter === 'RESERVED'"
+      (click)="setFilter('RESERVED')"
+    >
+      Réservées
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="listings-table-card card">
+    <div *ngFor="let i of [1,2,3]" class="skeleton-row">
+      <div class="skeleton thumb-skel"></div>
+      <div class="skeleton text-skel"></div>
+      <div class="skeleton action-skel"></div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && filteredListings.length === 0" class="card empty-state-box">
+    <div class="empty-icon-wrap">
+      <span class="material-icons-round icon-xl">inventory_2</span>
+    </div>
+    <h3>Aucune annonce trouvée</h3>
+    <p *ngIf="listings.length === 0">
+      Vous n'avez pas encore publié d'annonces. Donnez ou prêtez du matériel pour aider les parents autour de vous !
+    </p>
+    <p *ngIf="listings.length > 0">
+      Aucune annonce ne correspond à ce filtre de statut.
+    </p>
+    <a routerLink="/app/marketplace/new" class="btn btn-primary" *ngIf="listings.length === 0">
+      <span class="material-icons-round icon-sm">add_circle</span>
+      Publier ma première annonce
+    </a>
+  </div>
+
+  <!-- Listings List / Grid -->
+  <div *ngIf="!isLoading && filteredListings.length > 0" class="my-listings-list">
+    <div *ngFor="let item of filteredListings" class="card my-listing-item-card">
+      <div class="item-thumb-col">
+        <img
+          [src]="item.images && item.images.length ? item.images[0] : 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80'"
+          [alt]="item.title"
+        />
+      </div>
+
+      <div class="item-info-col">
+        <div class="badges-row">
+          <span class="badge" [ngClass]="getStatusBadgeClass(item.status)">
+            {{ getStatusLabel(item.status) }}
+          </span>
+          <span class="badge badge-neutral">
+            {{ getTypeLabel(item.type) }}
+          </span>
+          <span class="text-xs text-muted">
+            Publié le {{ item.createdAt | date:'shortDate' }}
+          </span>
+        </div>
+
+        <h3 class="item-title">
+          <a [routerLink]="['/app/marketplace', item.id]">{{ item.title }}</a>
+        </h3>
+
+        <div class="item-meta">
+          <span class="price-text" *ngIf="item.type === 'SALE'">{{ price(item) }}</span>
+          <span class="price-text free" *ngIf="item.type === 'DONATION'">Gratuit</span>
+          <span class="price-text free" *ngIf="item.type === 'LENDING'">Prêt gratuit</span>
+          <span class="price-text exchange" *ngIf="item.type === 'EXCHANGE'">Troc</span>
+
+          <span class="location-text">
+            <span class="material-icons-round icon-xs">location_on</span>
+            {{ item.location.city || 'Paris' }}
+          </span>
+
+          <span class="borrow-notes" *ngIf="item.status === 'BORROWED' && item.borrowDetails?.returnDate">
+            <span class="material-icons-round icon-xs">event</span>
+            Retour prévu le {{ item.borrowDetails?.returnDate | date:'shortDate' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="item-actions-col">
+        <a [routerLink]="['/app/marketplace', item.id]" class="btn btn-ghost btn-sm" title="Voir l'annonce">
+          <span class="material-icons-round icon-sm">visibility</span>
+          <span>Voir</span>
+        </a>
+
+        <a [routerLink]="['/app/marketplace', item.id, 'edit']" class="btn btn-secondary btn-sm" title="Modifier l'annonce">
+          <span class="material-icons-round icon-sm">edit</span>
+          <span>Modifier</span>
+        </a>
+
+        <button type="button" class="btn btn-danger btn-sm" (click)="confirmDelete(item)" title="Supprimer l'annonce">
+          <span class="material-icons-round icon-sm">delete_outline</span>
+          <span>Supprimer</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-backdrop" *ngIf="listingToDelete" (click)="cancelDelete()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="material-icons-round warning-icon">warning_amber</span>
+          <div>
+            <h3>Confirmer la suppression</h3>
+            <p class="modal-subtitle">Cette action est irréversible</p>
+          </div>
+        </div>
+        <button type="button" class="close-modal-btn" (click)="cancelDelete()">
+          <span class="material-icons-round icon-sm">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p>
+          Êtes-vous sûr(e) de vouloir supprimer définitivement l'annonce <strong>« {{ listingToDelete?.title }} »</strong> ?
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cancelDelete()">
+          Annuler
+        </button>
+        <button type="button" class="btn btn-danger" [disabled]="isDeleting" (click)="executeDelete()">
+          <span class="material-icons-round icon-sm" *ngIf="!isDeleting">delete</span>
+          <span class="material-icons-round icon-sm spin-loader" *ngIf="isDeleting">sync</span>
+          <span>{{ isDeleting ? 'Suppression...' : 'Supprimer définitivement' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

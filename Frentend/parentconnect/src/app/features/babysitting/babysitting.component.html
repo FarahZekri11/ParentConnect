@@ -1,0 +1,196 @@
+<div class="babysitting-page">
+  <!-- En-tête -->
+  <div class="header-section">
+    <div class="header-content">
+      <div class="header-titles">
+        <div class="badge-category">
+          <span class="material-icons-round icon-sm">child_care</span>
+          Entraide de garde entre parents
+        </div>
+        <h1>Baby-sitting de quartier</h1>
+        <p class="subtitle" *ngIf="isSitter && !isAdmin">
+          Consultez les demandes des parents de votre quartier et proposez votre aide. Chaque heure gardée est comptabilisée.
+        </p>
+        <p class="subtitle" *ngIf="!isSitter && !isAdmin">
+          Publiez une demande de garde ou trouvez un babysitter disponible près de chez vous.
+        </p>
+        <p class="subtitle" *ngIf="isAdmin">
+          Modération : toutes les demandes ouvertes, modifiables et supprimables par l'administrateur.
+        </p>
+      </div>
+
+      <div class="header-actions">
+        <div class="credit-balance" *ngIf="credits" [class.negative]="credits.balance < 0"
+             title="Votre solde de crédits-temps">
+          <span class="material-icons-round">hourglass_bottom</span>
+          <div>
+            <span class="credit-value">{{ credits.balance | number:'1.0-1':'fr' }} h</span>
+            <span class="credit-label">{{ isSitter ? 'Heures effectuées' : 'Solde d\'heures' }}</span>
+          </div>
+        </div>
+        <a *ngIf="canRequest" routerLink="/app/babysitting/new-request" class="btn btn-primary btn-publish">
+          <span class="material-icons-round">add_circle_outline</span>
+          Demander une garde
+        </a>
+      </div>
+    </div>
+
+    <div class="navigation-tabs">
+      <button *ngIf="canOffer" class="nav-tab" [class.active]="tab === 'OPEN'" (click)="selectTab('OPEN')">
+        <span class="material-icons-round icon-sm">volunteer_activism</span>
+        {{ isAdmin ? 'Toutes les demandes' : 'Demandes à pourvoir' }}
+      </button>
+      <button *ngIf="canRequest" class="nav-tab" [class.active]="tab === 'MINE'" (click)="selectTab('MINE')">
+        <span class="material-icons-round icon-sm">pending_actions</span>
+        Mes demandes ouvertes ({{ myOpenCount }})
+      </button>
+      <button *ngIf="canRequest" class="nav-tab" [class.active]="tab === 'SITTERS'" (click)="selectTab('SITTERS')">
+        <span class="material-icons-round icon-sm">person_search</span>
+        Trouver un babysitter
+      </button>
+      <a routerLink="/app/babysitting/my-bookings" class="nav-tab">
+        <span class="material-icons-round icon-sm">calendar_month</span>
+        Mes gardes & disponibilités
+      </a>
+    </div>
+  </div>
+
+  <!-- Filtres -->
+  <div class="filters-card card">
+    <div class="filters-grid">
+      <div class="filter-item">
+        <label for="neighborhoodFilter">Quartier</label>
+        <input id="neighborhoodFilter" type="text" class="form-control" placeholder="Ex : Montmartre"
+               [(ngModel)]="neighborhoodFilter" (keyup.enter)="load()" />
+      </div>
+      <div class="filter-item">
+        <label for="dateFilter">Date</label>
+        <input id="dateFilter" type="date" class="form-control" [(ngModel)]="dateFilter" (change)="load()" />
+      </div>
+      <div class="filter-item filter-buttons">
+        <button type="button" class="btn btn-secondary" (click)="load()">
+          <span class="material-icons-round icon-sm">search</span> Rechercher
+        </button>
+        <button *ngIf="neighborhoodFilter || dateFilter" type="button" class="btn-reset" (click)="resetFilters()">
+          <span class="material-icons-round icon-sm">restart_alt</span> Réinitialiser
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-header">
+    <div class="results-count">
+      <span class="count-number">{{ tab === 'SITTERS' ? sitters.length : visibleRequests.length }}</span>
+      <span class="count-label">{{ tab === 'SITTERS' ? 'disponibilité(s) de babysitters'
+        : (tab === 'MINE' ? 'demande(s) en attente d\'un babysitter' : 'demande(s) de garde à pourvoir') }}</span>
+    </div>
+    <div class="security-guarantee">
+      <span class="material-icons-round icon-sm security-icon">lock</span>
+      <span>Vie privée : aucun nom d'enfant, seulement des tranches d'âge</span>
+    </div>
+  </div>
+
+  <!-- Chargement -->
+  <div *ngIf="loading" class="grid-cards loading-grid">
+    <div class="card card-skeleton" *ngFor="let item of [1, 2, 3]">
+      <div class="skeleton skeleton-header"></div>
+      <div class="skeleton skeleton-body"></div>
+      <div class="skeleton skeleton-footer"></div>
+    </div>
+  </div>
+
+  <!-- Demandes -->
+  <!-- Babysitters disponibles (PARENT) -->
+  <div *ngIf="!loading && tab === 'SITTERS' && sitters.length > 0" class="grid-cards">
+    <div class="card card-hover babysitter-card sitter-card" *ngFor="let s of sitters">
+      <div class="card-top">
+        <div class="avatar-circle">{{ initials(s.userName) }}</div>
+        <div class="profile-meta">
+          <h3 class="profile-name">{{ s.userName || 'Babysitter' }}</h3>
+          <div class="location-row">
+            <span class="material-icons-round icon-sm">place</span> {{ s.neighborhood }}
+          </div>
+          <div class="rating-row">{{ slotLabel(s) }}</div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button type="button" class="btn btn-primary" (click)="contact(s)">
+          <span class="material-icons-round icon-sm">chat</span> Contacter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!loading && tab !== 'SITTERS' && visibleRequests.length > 0" class="grid-cards">
+    <div class="card card-hover babysitter-card request-card" *ngFor="let r of visibleRequests">
+      <div class="card-top">
+        <div class="date-box">
+          <span class="date-day">{{ dayNumber(r.date) }}</span>
+          <span class="date-month">{{ monthLabel(r.date) }}</span>
+        </div>
+        <div class="profile-meta">
+          <h3 class="profile-name">{{ r.startTime }} – {{ r.endTime }}</h3>
+          <div class="location-row">
+            <span class="material-icons-round icon-sm">place</span> {{ r.neighborhood }}
+          </div>
+          <div class="rating-row">{{ formatDate(r.date) }}</div>
+        </div>
+        <div class="price-pill" title="Crédits gagnés par le parent qui garde">
+          <span class="price-val">{{ r.hours | number:'1.0-1':'fr' }} h</span>
+          <span class="price-unit">crédits</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <div class="cert-chips">
+          <span class="chip-item">
+            <span class="material-icons-round cert-icon">child_care</span>
+            {{ r.numChildren }} enfant{{ r.numChildren > 1 ? 's' : '' }}
+          </span>
+          <span class="chip-item" *ngFor="let age of r.childAgeRanges">{{ age }} ans</span>
+        </div>
+        <p class="bio-text" *ngIf="r.notes">« {{ r.notes }} »</p>
+        <p class="owner-line">
+          <span class="material-icons-round icon-sm">person</span>
+          Publiée par {{ r.isMine ? 'vous' : (r.requesterName || 'un parent du quartier') }}
+        </p>
+      </div>
+
+      <div class="card-footer">
+        <span *ngIf="r.isMine" class="mine-label">Votre demande · en attente d'un babysitter</span>
+        <div *ngIf="canManage(r)" class="manage-actions">
+          <button type="button" class="btn btn-secondary btn-sm" (click)="edit(r)" [disabled]="busyId === r.id">
+            <span class="material-icons-round icon-sm">edit</span> Modifier
+          </button>
+          <button type="button" class="btn btn-danger btn-sm" (click)="remove(r)" [disabled]="busyId === r.id">
+            <span class="material-icons-round icon-sm">delete</span> Supprimer
+          </button>
+        </div>
+        <button *ngIf="!r.isMine && canOffer" type="button" class="btn btn-primary"
+                [disabled]="pendingOfferId === r.id" (click)="offer(r)">
+          <span class="material-icons-round icon-sm">volunteer_activism</span>
+          {{ pendingOfferId === r.id ? 'Envoi...' : 'Je peux garder' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vide / erreur -->
+  <div *ngIf="!loading && (tab === 'SITTERS' ? sitters.length === 0 : visibleRequests.length === 0)" class="empty-state card">
+    <div class="empty-icon-wrap">
+      <span class="material-icons-round">{{ loadError ? 'cloud_off' : 'child_friendly' }}</span>
+    </div>
+    <h3>{{ loadError ? 'Service Babysitting indisponible'
+      : (tab === 'SITTERS' ? 'Aucun babysitter disponible' : (tab === 'MINE' ? 'Aucune demande ouverte' : 'Aucune demande à pourvoir')) }}</h3>
+    <p>
+      {{ loadError ? 'Réessayez dans un instant.'
+        : (tab === 'SITTERS' ? 'Aucun créneau ne correspond à ces critères. Essayez un autre quartier ou une autre date.'
+        : (tab === 'MINE' ? 'Publiez une demande : les babysitters du quartier pourront vous proposer leur aide.'
+        : 'Aucun parent n\'a besoin d\'aide pour le moment avec ces critères.')) }}
+    </p>
+    <div class="empty-actions">
+      <button type="button" class="btn btn-secondary" (click)="resetFilters()">Actualiser</button>
+      <a *ngIf="canRequest" routerLink="/app/babysitting/new-request" class="btn btn-primary">Demander une garde</a>
+    </div>
+  </div>
+</div>

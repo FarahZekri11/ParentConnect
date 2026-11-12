@@ -1,0 +1,98 @@
+<header class="header">
+  <div class="header-left">
+    <button type="button" class="btn btn-ghost btn-icon menu-btn" (click)="menuToggled.emit()" aria-label="Ouvrir le menu de navigation">
+      <span class="material-icons-round" aria-hidden="true">menu</span>
+    </button>
+
+    <a routerLink="/app/dashboard" class="header-brand-mobile" title="ParentConnect">
+      <img src="/logo2.png" alt="ParentConnect" class="header-brand-logo" />
+      <span class="header-brand-name">ParentConnect</span>
+    </a>
+
+    <div class="header-location" *ngIf="currentUser">
+      <span class="material-icons-round icon-sm" aria-hidden="true">near_me</span>
+      <span class="location-text">{{ currentUser.city || 'Ville à renseigner' }}<span class="location-sep" *ngIf="currentUser.neighborhood">·</span>{{ currentUser.neighborhood }}</span>
+      <span class="location-live" title="Communauté active"></span>
+    </div>
+
+    <div class="header-bg-selector" title="Changer l'ambiance de la plateforme">
+      <span class="bg-label">Ambiance</span>
+      <div class="bg-dots-group">
+        <button
+          *ngFor="let p of bgService.photos; let i = index"
+          type="button"
+          class="header-bg-dot"
+          [class.active]="bgService.activePhotoIndex() === i"
+          (click)="bgService.setPhotoIndex(i)"
+          [attr.aria-label]="'Ambiance photo ' + (i + 1)"
+          [attr.aria-pressed]="bgService.activePhotoIndex() === i"
+        >
+          <span class="bg-dot-thumb" [style.background-image]="'url(' + p + ')'"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <a routerLink="/app/marketplace/new" class="btn btn-primary btn-sm header-publish">
+      <span class="material-icons-round icon-sm" aria-hidden="true">add</span>
+      <span class="publish-text">Publier</span>
+    </a>
+
+    <div class="notif-wrapper">
+      <button type="button" class="notif-btn" title="Notifications" aria-label="Voir les notifications"
+              (click)="toggleNotifications()" [attr.aria-expanded]="showNotifications">
+        <span class="material-icons-round" aria-hidden="true">{{ unreadNotifications > 0 ? 'notifications_active' : 'notifications_none' }}</span>
+        <span *ngIf="unreadNotifications > 0" class="notif-dot" aria-hidden="true"></span>
+      </button>
+
+      <div *ngIf="showNotifications" class="notif-dropdown" role="dialog" aria-label="Notifications">
+        <div class="notif-head">
+          <strong>Notifications</strong>
+          <button *ngIf="unreadNotifications > 0" type="button" class="notif-readall" (click)="markAllRead()">Tout marquer comme lu</button>
+        </div>
+        <p *ngIf="notifications.length === 0" class="notif-empty">Aucune notification pour le moment.</p>
+        <div *ngFor="let n of notifications" class="notif-item" [class.unread]="!n.read">
+          <span class="material-icons-round notif-icon">{{ notificationIcon(n.type) }}</span>
+          <div class="notif-body">
+            <span class="notif-title">{{ n.title }}</span>
+            <span class="notif-text">{{ n.message }}</span>
+            <span class="notif-date">{{ n.createdAt | date:'d MMM, HH:mm' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="user-menu-wrapper" (clickoutside)="showUserMenu = false">
+      <button type="button" class="user-avatar-btn" (click)="toggleMenu()" aria-haspopup="menu" [attr.aria-expanded]="showUserMenu" aria-label="Ouvrir le menu du compte">
+        <div class="avatar avatar-sm user-avatar-badge">{{getInitials()}}</div>
+        <span class="user-name-text">{{currentUser?.firstName || 'Mon compte'}}</span>
+        <span class="material-icons-round expand-icon" aria-hidden="true">expand_more</span>
+      </button>
+
+      <div class="user-dropdown" *ngIf="showUserMenu" role="menu">
+        <div class="dropdown-header">
+          <div class="avatar avatar-md user-avatar-badge">{{getInitials()}}</div>
+          <div>
+            <p class="fw-600">{{currentUser?.firstName}} {{currentUser?.lastName}}</p>
+            <p class="text-xs text-muted">{{currentUser?.email}}</p>
+          </div>
+        </div>
+        <hr class="divider" />
+        <a routerLink="/app/profile" class="dropdown-item" role="menuitem" (click)="showUserMenu = false">
+          <span class="material-icons-round icon-sm dd-icon dd-icon--secondary" aria-hidden="true">person</span> Mon profil
+        </a>
+        <a routerLink="/app/family" class="dropdown-item" role="menuitem" (click)="showUserMenu = false">
+          <span class="material-icons-round icon-sm dd-icon dd-icon--primary" aria-hidden="true">family_restroom</span> Ma famille
+        </a>
+        <a routerLink="/app/marketplace/my-listings" class="dropdown-item" role="menuitem" (click)="showUserMenu = false">
+          <span class="material-icons-round icon-sm dd-icon dd-icon--accent" aria-hidden="true">storefront</span> Mes annonces
+        </a>
+        <hr class="divider" />
+        <button type="button" class="dropdown-item danger" role="menuitem" (click)="logout()">
+          <span class="material-icons-round icon-sm" aria-hidden="true">logout</span> Se déconnecter
+        </button>
+      </div>
+    </div>
+  </div>
+</header>

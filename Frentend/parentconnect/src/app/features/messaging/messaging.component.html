@@ -1,0 +1,239 @@
+<div class="messaging-page">
+  <div class="messaging-container" [class.show-chat-mobile]="!!selectedConversation">
+    
+    <!-- LEFT COLUMN: Conversation List -->
+    <aside class="conversations-sidebar">
+      <div class="sidebar-header">
+        <div class="header-title-row">
+          <h2 class="title">Messages</h2>
+          <span class="chat-count-badge" *ngIf="conversations.length">
+            {{ conversations.length }}
+          </span>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-box">
+          <span class="material-icons-round search-icon">search</span>
+          <input
+            type="text"
+            placeholder="Rechercher une discussion..."
+            [(ngModel)]="searchQuery"
+            (ngModelChange)="applyFilter()"
+          />
+          <button
+            *ngIf="searchQuery"
+            class="clear-search-btn"
+            (click)="searchQuery = ''; applyFilter()"
+            type="button"
+            aria-label="Effacer la recherche"
+          >
+            <span class="material-icons-round">close</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Conversations Scrollable Area -->
+      <div class="conversations-list">
+        <div *ngIf="loadingConversations" class="loading-state">
+          <div class="skeleton convo-skeleton" *ngFor="let i of [1, 2, 3]"></div>
+        </div>
+
+        <div *ngIf="!loadingConversations && filteredConversations.length === 0" class="empty-state">
+          <span class="material-icons-round empty-icon">chat_bubble_outline</span>
+          <p class="empty-text">Aucune conversation trouvée</p>
+        </div>
+
+        <button
+          type="button"
+          *ngFor="let convo of filteredConversations"
+          class="conversation-item"
+          [class.active]="selectedConversation?.id === convo.id"
+          (click)="selectConversation(convo)"
+        >
+          <!-- User Avatar with Online Dot -->
+          <div class="avatar-wrapper">
+            <img
+              *ngIf="getOtherParticipant(convo).avatar"
+              [src]="getOtherParticipant(convo).avatar"
+              [alt]="getOtherParticipant(convo).name"
+              class="avatar avatar-md"
+            />
+            <div *ngIf="!getOtherParticipant(convo).avatar" class="avatar avatar-md avatar-initials">
+              {{ getInitials(getOtherParticipant(convo).name) }}
+            </div>
+            <span
+              class="online-dot"
+              *ngIf="getOtherParticipant(convo).isOnline"
+              title="En ligne"
+            ></span>
+          </div>
+
+          <!-- Conversation Info -->
+          <div class="convo-info">
+            <div class="convo-top">
+              <span class="user-name">{{ getOtherParticipant(convo).name }}</span>
+              <span class="timestamp">{{ formatTime(convo.updatedAt) }}</span>
+            </div>
+            <div class="convo-bottom">
+              <p class="last-message" [class.unread]="convo.unreadCount > 0">
+                <span *ngIf="convo.lastMessage?.senderId === currentUserId" class="sent-prefix">Vous : </span>
+                {{ convo.lastMessage?.content || 'Nouvelle conversation' }}
+              </p>
+              <span class="unread-pill" *ngIf="convo.unreadCount > 0">
+                {{ convo.unreadCount }}
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+    </aside>
+
+    <!-- RIGHT COLUMN: Active Chat View -->
+    <main class="chat-main" [class.no-selection]="!selectedConversation">
+      <ng-container *ngIf="selectedConversation; else noConversationTemplate">
+        <!-- Chat Header -->
+        <header class="chat-header">
+          <button class="back-btn" (click)="backToList()" type="button" aria-label="Retour à la liste">
+            <span class="material-icons-round">arrow_back</span>
+          </button>
+
+          <div class="chat-user-profile">
+            <div class="avatar-wrapper">
+              <img
+                *ngIf="getOtherParticipant(selectedConversation).avatar"
+                [src]="getOtherParticipant(selectedConversation).avatar"
+                [alt]="getOtherParticipant(selectedConversation).name"
+                class="avatar avatar-md"
+              />
+              <div *ngIf="!getOtherParticipant(selectedConversation).avatar" class="avatar avatar-md avatar-initials">
+                {{ getInitials(getOtherParticipant(selectedConversation).name) }}
+              </div>
+              <span
+                class="online-dot"
+                *ngIf="getOtherParticipant(selectedConversation).isOnline"
+              ></span>
+            </div>
+
+            <div class="user-meta">
+              <h3 class="user-name">{{ getOtherParticipant(selectedConversation).name }}</h3>
+              <span class="status-indicator">
+                {{ selectedConversation.title }}
+              </span>
+            </div>
+          </div>
+
+          <div class="chat-actions">
+            <button class="icon-action-btn" title="Options de conversation" type="button">
+              <span class="material-icons-round">more_vert</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Messages Body -->
+        <div class="messages-container" #messagesScrollContainer>
+          <div *ngIf="loadingMessages" class="loading-state">
+            <span class="material-icons-round spin">sync</span>
+            <p>Chargement des messages...</p>
+          </div>
+
+          <div class="messages-list" *ngIf="!loadingMessages">
+            <div
+              *ngFor="let msg of messages"
+              class="message-row"
+              [class.sent]="msg.senderId === currentUserId"
+              [class.received]="msg.senderId !== currentUserId"
+            >
+              <div class="message-bubble" [class.deleted]="msg.deleted">
+                <p *ngIf="msg.deleted" class="message-text deleted-text">
+                  <span class="material-icons-round icon-xs">block</span> Message supprimé
+                </p>
+                <ng-container *ngIf="!msg.deleted">
+                  <div *ngIf="msg.attachments?.length" class="message-images">
+                    <ng-container *ngFor="let a of msg.attachments">
+                      <img *ngIf="imageUrl(a.id) as src; else imgLoading" [src]="src" alt="Image jointe" (click)="openImage(a.id)" />
+                      <ng-template #imgLoading><div class="img-placeholder"><span class="material-icons-round">image</span></div></ng-template>
+                    </ng-container>
+                  </div>
+                  <div *ngIf="editingId === msg.id; else showText" class="edit-box">
+                    <textarea [(ngModel)]="editText" rows="2" aria-label="Modifier le message"></textarea>
+                    <div class="edit-actions">
+                      <button type="button" class="btn-link" (click)="cancelEdit()">Annuler</button>
+                      <button type="button" class="btn-link strong" (click)="saveEdit(msg)">Enregistrer</button>
+                    </div>
+                  </div>
+                  <ng-template #showText><p *ngIf="msg.content" class="message-text">{{ msg.content }}</p></ng-template>
+                </ng-container>
+                <div class="message-meta">
+                  <span *ngIf="msg.editedAt && !msg.deleted" class="edited-label">modifié</span>
+                  <span class="message-time">{{ formatMessageTime(msg.sentAt) }}</span>
+                  <span
+                    *ngIf="msg.senderId === currentUserId"
+                    class="material-icons-round read-status"
+                    [class.is-read]="msg.isRead"
+                  >
+                    done_all
+                  </span>
+                </div>
+                <div *ngIf="msg.senderId === currentUserId && !msg.deleted && editingId !== msg.id" class="message-actions">
+                  <button *ngIf="msg.content" type="button" (click)="startEdit(msg)" title="Modifier" aria-label="Modifier le message">
+                    <span class="material-icons-round">edit</span>
+                  </button>
+                  <button type="button" (click)="deleteMessage(msg)" title="Supprimer" aria-label="Supprimer le message">
+                    <span class="material-icons-round">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <footer class="chat-input-bar">
+          <div *ngIf="pendingImages.length" class="pending-images">
+            <div *ngFor="let p of pendingImages; let i = index" class="pending-image">
+              <img [src]="p.preview" [alt]="p.file.name" />
+              <button type="button" (click)="removePendingImage(i)" aria-label="Retirer l'image">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
+          </div>
+          <div class="input-wrapper">
+            <label class="attach-btn" [class.disabled]="pendingImages.length >= maxImages || isSending" title="Joindre une image" for="msgImageInput">
+              <span class="material-icons-round">add_photo_alternate</span>
+              <input id="msgImageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden
+                     [disabled]="pendingImages.length >= maxImages || isSending" (change)="onImagesSelected($event)" />
+            </label>
+            <textarea
+              [(ngModel)]="newMessageText"
+              (keydown)="onKeyDown($event)"
+              placeholder="Écrivez votre message..."
+              rows="1"
+            ></textarea>
+
+            <button
+              class="send-btn"
+              [disabled]="(!newMessageText.trim() && !pendingImages.length) || isSending"
+              (click)="sendMessage()"
+              type="button"
+              aria-label="Envoyer le message"
+            >
+              <span class="material-icons-round">send</span>
+            </button>
+          </div>
+        </footer>
+      </ng-container>
+
+      <!-- Empty / No Chat Selected Template -->
+      <ng-template #noConversationTemplate>
+        <div class="empty-chat-selection">
+          <div class="empty-bubble-illustration">
+            <span class="material-icons-round">forum</span>
+          </div>
+          <h3>Vos messages ParentConnect</h3>
+          <p>Sélectionnez une discussion à gauche pour afficher les messages échangés avec les autres parents du quartier.</p>
+        </div>
+      </ng-template>
+    </main>
+
+  </div>
+</div>

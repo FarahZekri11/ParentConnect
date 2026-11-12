@@ -1,0 +1,848 @@
+# =====================================================================
+# ParentConnect — Docker Compose CENTRAL (intégration de toute la plateforme)
+#
+#   1 API Gateway + 1 Eureka + 1 Keycloak + 1 RabbitMQ + frontend
+#   + 10 microservices métier (6 modules), chacun avec SA propre base de données
+#   sur UN réseau Docker partagé : parentconnect-network
+#
+# Démarrage (Windows PowerShell, depuis la racine du projet) :
+#   .\scripts\setup.ps1            (une seule fois : crée .env et les clés du realm)
+#   docker compose up -d --build
+# Documentation : Documentation/INTEGRATION.md
+#
+# Les fichiers docker-compose.service.yml / local-test.yml de chaque membre restent inchangés
+# (tests isolés). Ce fichier construit chaque service depuis son propre Dockerfile.
+# =====================================================================
+name: parentconnect
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - parentconnect-network
+
+x-postgres-healthcheck: &postgres-healthcheck
+  test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+  interval: 5s
+  timeout: 5s
+  retries: 20
+
+x-mongo-healthcheck: &mongo-healthcheck
+  test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+  interval: 10s
+  timeout: 5s
+  retries: 20
+
+x-redis-healthcheck: &redis-healthcheck
+  test: ["CMD", "redis-cli", "ping"]
+  interval: 5s
+  timeout: 3s
+  retries: 20
+
+# Variables communes aux microservices (infrastructure partagée, URL internes Docker)
+x-shared-env: &shared-env
+  TZ: ${TZ:-Europe/Paris}
+  EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+  KEYCLOAK_REALM: ${KEYCLOAK_REALM:-parentconnect}
+  KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:?Lancer d'abord scripts/setup (KEYCLOAK_REALM_PUBLIC_KEY manquante)}
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+
+services:
+
+  # ===================================================================
+  # INFRASTRUCTURE PARTAGÉE (gérée par l'intégrateur)
+  # ===================================================================
+
+  # --- Eureka : annuaire unique (alias réseau "eureka-server", nom attendu par tous les services)
+  discovery-server:
+    <<: *service-defaults
+    build:
+      context: ./Backend/discovery-server
+    image: parentconnect/discovery-server:1.0
+    container_name: parentconnect_discovery_server
+    ports:
+      - "${EUREKA_PORT:-8761}:8761"
+    networks:
+      parentconnect-network:
+        aliases:
+          - eureka-server
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  # --- Spring Cloud Config Server : configuration centralisée (dossier Backend/config-repo, aucun secret)
+  config-server:
+    <<: *service-defaults
+    build:
+      context: ./Backend/config-server
+    image: parentconnect/config-server:1.0
+    container_name: parentconnect_config_server
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      CONFIG_REPO_LOCATION: file:/config-repo
+    volumes:
+      - ./Backend/config-repo:/config-repo:ro
+    ports:
+      - "${CONFIG_SERVER_PORT:-8888}:8888"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  # --- Keycloak : realm "parentconnect" importé au démarrage (rôles ADMIN / PARENT / PROFESSIONAL)
+  keycloak:
+    <<: *service-defaults
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: parentconnect_keycloak
+    command: start-dev --http-port=8180 --import-realm
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Lancer d'abord scripts/setup}
+      KC_HEALTH_ENABLED: "true"
+      # Émetteur (iss) identique pour le navigateur et les conteneurs
+      KC_HOSTNAME_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+      KC_HOSTNAME_ADMIN_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8180}
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+      # Valeurs injectées dans le fichier du realm (placeholders ${...})
+      KC_DEMO_PASSWORD: ${KC_DEMO_PASSWORD:?Lancer d'abord scripts/setup}
+      KC_REALM_PRIVATE_KEY: ${KC_REALM_PRIVATE_KEY:?Lancer d'abord scripts/setup}
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8180"
+    volumes:
+      - ./Backend/keycloak/parentconnect-realm.json:/opt/keycloak/data/import/parentconnect-realm.json:ro
+      # Base H2 de Keycloak (comptes créés pendant la démonstration) : persistante
+      - keycloak_storage:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8180 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # --- Client Keycloak d'inscription (exécution unique à chaque démarrage, puis arrêt)
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: parentconnect_keycloak_init
+    restart: "no"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+        restart: true
+    entrypoint: ["/bin/bash", "/init-registration-client.sh"]
+    environment:
+      KEYCLOAK_URL: http://keycloak:8180
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_REGISTRATION_CLIENT_SECRET: ${KC_REGISTRATION_CLIENT_SECRET:?Relancer scripts/setup (KC_REGISTRATION_CLIENT_SECRET manquant)}
+      KC_DEMO_PASSWORD: ${KC_DEMO_PASSWORD}
+      KC_APP_ADMIN_PASSWORD: ${KC_APP_ADMIN_PASSWORD:?Relancer scripts/setup (KC_APP_ADMIN_PASSWORD manquant)}
+    volumes:
+      - ./Backend/keycloak/init-registration-client.sh:/init-registration-client.sh:ro
+    networks:
+      - parentconnect-network
+
+  # --- RabbitMQ : broker unique
+  rabbitmq:
+    <<: *service-defaults
+    image: rabbitmq:3.13-management
+    container_name: parentconnect_rabbitmq
+    # Nom d'hôte fixe : RabbitMQ range ses données (queues durables) par nom de nœud (rabbit@<hostname>).
+    # Sans lui, chaque recréation du conteneur repartait d'un broker vide.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Lancer d'abord scripts/setup}
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 20s
+      retries: 30
+      start_period: 60s
+
+  # --- Déclaration centralisée des exchanges RabbitMQ (exécution unique, puis arrêt)
+  rabbitmq-init:
+    image: curlimages/curl:8.10.1
+    container_name: parentconnect_rabbitmq_init
+    restart: "no"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+        # Relancé automatiquement si RabbitMQ est recréé (exchanges et pont redéclarés)
+        restart: true
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    volumes:
+      - ./Backend/rabbitmq/init-definitions.sh:/init-definitions.sh:ro
+    entrypoint: ["sh", "/init-definitions.sh"]
+    networks:
+      - parentconnect-network
+
+  # --- API Gateway : point d'entrée unique du frontend
+  api-gateway:
+    <<: *service-defaults
+    build:
+      context: ./Backend/api-gateway
+    image: parentconnect/api-gateway:1.0
+    # Nom utilisé par la configuration nginx du frontend
+    container_name: parentconnect_api_gateway
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}/realms/${KEYCLOAK_REALM:-parentconnect}/protocol/openid-connect/certs
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/parentconnect}
+      # Inscription des nouveaux parents (client « parentconnect-registration », créé par keycloak-init)
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}
+      KC_REGISTRATION_CLIENT_SECRET: ${KC_REGISTRATION_CLIENT_SECRET}
+      # Cache DNS court : un service recréé change d'IP (sinon la Gateway peut joindre un autre conteneur)
+      JAVA_TOOL_OPTIONS: -Dsun.net.inetaddr.ttl=5 -Dsun.net.inetaddr.negative.ttl=1
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  # --- Frontend Angular (nginx) : appelle uniquement la Gateway
+  frontend:
+    <<: *service-defaults
+    build:
+      context: ./Frentend/parentconnect
+    image: parentconnect/frontend:1.0
+    container_name: parentconnect_frontend
+    depends_on:
+      - api-gateway
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+
+  # ===================================================================
+  # MODULE ÉVÉNEMENTS (Eya) — Spring Boot / PostgreSQL
+  # ===================================================================
+  event-postgres:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_event_db
+    environment:
+      POSTGRES_DB: events_db
+      POSTGRES_USER: events_user
+      POSTGRES_PASSWORD: ${EVENT_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - event_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  event-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/event-service
+    image: parentconnect-event:1.0
+    container_name: event-service
+    depends_on:
+      event-postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *shared-env
+      PORT: "8080"
+      SPRING_PROFILES_ACTIVE: ""
+      DB_HOST: event-postgres
+      DB_PORT: "5432"
+      DB_NAME: events_db
+      DB_USERNAME: events_user
+      DB_PASSWORD: ${EVENT_DB_PASSWORD}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/parentconnect}
+      GATEWAY_RELAY_ENABLED: "true"
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_USERNAME: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      INTERNAL_API_KEY: ${EVENTS_INTERNAL_API_KEY:?Lancer d'abord scripts/setup}
+      EVENT_SERVICE_PUBLIC_URL: http://localhost:${EVENT_SERVICE_PORT:-8085}
+      CONFIG_SERVER_URL: http://config-server:8888
+    ports:
+      - "${EVENT_SERVICE_PORT:-8085}:8080"
+
+  participation-postgres:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_participation_db
+    environment:
+      POSTGRES_DB: participations_db
+      POSTGRES_USER: participations_user
+      POSTGRES_PASSWORD: ${PARTICIPATION_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - participation_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  participation-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/participation-service
+    image: parentconnect-participation:1.0
+    container_name: participation-service
+    depends_on:
+      participation-postgres:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      PORT: "8080"
+      SPRING_PROFILES_ACTIVE: ""
+      DB_HOST: participation-postgres
+      DB_PORT: "5432"
+      DB_NAME: participations_db
+      DB_USERNAME: participations_user
+      DB_PASSWORD: ${PARTICIPATION_DB_PASSWORD}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8180/realms/parentconnect}
+      GATEWAY_RELAY_ENABLED: "true"
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_USERNAME: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # Vide : Event Service est résolu dans Eureka par le client OpenFeign (PARENTCONNECT-EVENT-SERVICE)
+      EVENT_SERVICE_URL: ""
+      CONFIG_SERVER_URL: http://config-server:8888
+      INTERNAL_API_KEY: ${EVENTS_INTERNAL_API_KEY}
+      PARTICIPATION_SERVICE_PUBLIC_URL: http://localhost:${PARTICIPATION_SERVICE_PORT:-8086}
+    ports:
+      - "${PARTICIPATION_SERVICE_PORT:-8086}:8080"
+
+  # ===================================================================
+  # MODULE COMMUNAUTÉ (Feriel) — Laravel / PostgreSQL (4 services)
+  # ===================================================================
+  post-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_post_db
+    environment:
+      POSTGRES_DB: post_db
+      POSTGRES_USER: post_user
+      POSTGRES_PASSWORD: ${POST_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - post_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  post-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/post-service
+    image: parentconnect/post-service:1.0
+    container_name: parentconnect-post-service
+    depends_on:
+      post-db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      APP_NAME: "Post Service"
+      # Fournie par .env : sans elle, le script de démarrage tente "key:generate" sans fichier .env et échoue
+      APP_KEY: ${POST_APP_KEY:?Lancer d'abord scripts/setup}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:${POST_SERVICE_PORT:-8001}
+      APP_PORT: "8080"
+      PORT: "8080"
+      DB_CONNECTION: pgsql
+      DB_HOST: post-db
+      DB_PORT: "5432"
+      DB_DATABASE: post_db
+      DB_USERNAME: post_user
+      DB_PASSWORD: ${POST_DB_PASSWORD}
+      AUTO_MIGRATE: "true"
+      # Valeurs du .env.example du propriétaire (sinon Laravel utilise la base pour le cache -> table "cache" absente)
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      AUTO_SEED: "false"
+      L5_SWAGGER_GENERATE_ALWAYS: "true"
+      EUREKA_APP_NAME: parentconnect-post
+      EUREKA_INSTANCE_HOST: parentconnect-post-service
+      EUREKA_PORT: "8080"
+      KEYCLOAK_AUTH_SERVER_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}
+      JWT_SECRET: ${COMMUNITY_JWT_SECRET:?Lancer d'abord scripts/setup}
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /
+      RABBITMQ_QUEUE: post_events_queue
+    volumes:
+      # Photos des publications téléversées depuis l'ordinateur (volume persistant)
+      - post_uploads:/var/www/html/storage/app/post-images
+    ports:
+      - "${POST_SERVICE_PORT:-8001}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  comment-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_comment_db
+    environment:
+      POSTGRES_DB: comment_db
+      POSTGRES_USER: comment_user
+      POSTGRES_PASSWORD: ${COMMENT_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - comment_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  comment-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/comment-service
+    image: parentconnect/comment-service:1.0
+    container_name: parentconnect-comment-service
+    depends_on:
+      comment-db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      APP_NAME: "Comment Service"
+      # Fournie par .env : sans elle, le script de démarrage tente "key:generate" sans fichier .env et échoue
+      APP_KEY: ${COMMENT_APP_KEY:?Lancer d'abord scripts/setup}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:${COMMENT_SERVICE_PORT:-8002}
+      APP_PORT: "8080"
+      PORT: "8080"
+      DB_CONNECTION: pgsql
+      DB_HOST: comment-db
+      DB_PORT: "5432"
+      DB_DATABASE: comment_db
+      DB_USERNAME: comment_user
+      DB_PASSWORD: ${COMMENT_DB_PASSWORD}
+      AUTO_MIGRATE: "true"
+      # Valeurs du .env.example du propriétaire (sinon Laravel utilise la base pour le cache -> table "cache" absente)
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      AUTO_SEED: "false"
+      L5_SWAGGER_GENERATE_ALWAYS: "true"
+      EUREKA_APP_NAME: parentconnect-comment
+      EUREKA_INSTANCE_HOST: parentconnect-comment-service
+      EUREKA_PORT: "8080"
+      KEYCLOAK_AUTH_SERVER_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}
+      JWT_SECRET: ${COMMUNITY_JWT_SECRET}
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /
+      RABBITMQ_QUEUE: comment_events_queue
+    ports:
+      - "${COMMENT_SERVICE_PORT:-8002}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  category-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_category_db
+    environment:
+      POSTGRES_DB: category_db
+      POSTGRES_USER: category_user
+      POSTGRES_PASSWORD: ${CATEGORY_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - category_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  category-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/category-service
+    image: parentconnect/category-service:1.0
+    container_name: parentconnect-category-service
+    depends_on:
+      category-db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      APP_NAME: "Category Service"
+      # Fournie par .env : sans elle, le script de démarrage tente "key:generate" sans fichier .env et échoue
+      APP_KEY: ${CATEGORY_APP_KEY:?Lancer d'abord scripts/setup}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:${CATEGORY_SERVICE_PORT:-8003}
+      APP_PORT: "8080"
+      PORT: "8080"
+      DB_CONNECTION: pgsql
+      DB_HOST: category-db
+      DB_PORT: "5432"
+      DB_DATABASE: category_db
+      DB_USERNAME: category_user
+      DB_PASSWORD: ${CATEGORY_DB_PASSWORD}
+      AUTO_MIGRATE: "true"
+      # Valeurs du .env.example du propriétaire (sinon Laravel utilise la base pour le cache -> table "cache" absente)
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      # Catégories de démonstration créées au démarrage (DatabaseSeeder -> CategorySeeder, idempotent)
+      AUTO_SEED: "true"
+      L5_SWAGGER_GENERATE_ALWAYS: "true"
+      EUREKA_APP_NAME: parentconnect-category
+      EUREKA_INSTANCE_HOST: parentconnect-category-service
+      EUREKA_PORT: "8080"
+      KEYCLOAK_AUTH_SERVER_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}
+      JWT_SECRET: ${COMMUNITY_JWT_SECRET}
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /
+      RABBITMQ_QUEUE: category_events_queue
+    ports:
+      - "${CATEGORY_SERVICE_PORT:-8003}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  report-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_report_db
+    environment:
+      POSTGRES_DB: report_db
+      POSTGRES_USER: report_user
+      POSTGRES_PASSWORD: ${REPORT_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - report_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  report-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/report-service
+    image: parentconnect/report-service:1.0
+    container_name: parentconnect-report-service
+    depends_on:
+      report-db:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      APP_NAME: "Report Service"
+      # Fournie par .env : sans elle, le script de démarrage tente "key:generate" sans fichier .env et échoue
+      APP_KEY: ${REPORT_APP_KEY:?Lancer d'abord scripts/setup}
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:${REPORT_SERVICE_PORT:-8004}
+      APP_PORT: "8080"
+      PORT: "8080"
+      DB_CONNECTION: pgsql
+      DB_HOST: report-db
+      DB_PORT: "5432"
+      DB_DATABASE: report_db
+      DB_USERNAME: report_user
+      DB_PASSWORD: ${REPORT_DB_PASSWORD}
+      AUTO_MIGRATE: "true"
+      # Valeurs du .env.example du propriétaire (sinon Laravel utilise la base pour le cache -> table "cache" absente)
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+      AUTO_SEED: "false"
+      L5_SWAGGER_GENERATE_ALWAYS: "true"
+      EUREKA_APP_NAME: parentconnect-report
+      EUREKA_INSTANCE_HOST: parentconnect-report-service
+      EUREKA_PORT: "8080"
+      KEYCLOAK_AUTH_SERVER_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}
+      JWT_SECRET: ${COMMUNITY_JWT_SECRET}
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /
+      RABBITMQ_QUEUE: report_events_queue
+    ports:
+      - "${REPORT_SERVICE_PORT:-8004}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # ===================================================================
+  # MODULE BABYSITTING — FastAPI / PostgreSQL + Redis
+  # ===================================================================
+  babysitting-db:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: parentconnect_babysitting_db
+    environment:
+      POSTGRES_DB: babysitting_db
+      POSTGRES_USER: babysitting
+      POSTGRES_PASSWORD: ${BABYSITTING_DB_PASSWORD:?Lancer d'abord scripts/setup}
+    volumes:
+      - babysitting_db_data:/var/lib/postgresql/data
+    healthcheck: *postgres-healthcheck
+
+  babysitting-redis:
+    <<: *service-defaults
+    image: redis:7-alpine
+    container_name: parentconnect_babysitting_redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - babysitting_redis_data:/data
+    healthcheck: *redis-healthcheck
+
+  babysitting-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/babysitting-service
+      target: production
+    image: parentconnect/babysitting-service:1.0
+    container_name: babysitting-service
+    depends_on:
+      babysitting-db:
+        condition: service_healthy
+      babysitting-redis:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
+    # Même commande que le docker-compose.service.yml du service : migrations Alembic puis API
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8080"
+    environment:
+      <<: *shared-env
+      PORT: "8080"
+      APP_PORT: "8080"
+      SERVICE_PORT: "8080"
+      SERVICE_NAME: babysitting-service
+      SERVICE_VERSION: 0.1.0
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://babysitting:${BABYSITTING_DB_PASSWORD}@babysitting-db:5432/babysitting_db
+      REDIS_URL: redis://babysitting-redis:6379/0
+      JWT_ALGORITHM: RS256
+      EUREKA_ENABLED: "true"
+      EUREKA_APP_NAME: PARENTCONNECT-BABYSITTING
+      EUREKA_INSTANCE_HOST: babysitting-service
+      EUREKA_HEARTBEAT_INTERVAL: "30"
+      EUREKA_LEASE_DURATION: "90"
+      RABBITMQ_ENABLED: "true"
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /
+      RABBITMQ_EXCHANGE: parentconnect.topic
+      RABBITMQ_QUEUE: babysitting_events_queue
+      # Le service Identity & Family n'existe pas encore : client d'identité simulé (prévu par le service)
+      USE_MOCK_IDENTITY: "true"
+    ports:
+      - "${BABYSITTING_SERVICE_PORT:-8005}:8080"
+
+  # ===================================================================
+  # MODULE MARKETPLACE (Farah) — NestJS / MongoDB
+  # ===================================================================
+  marketplace-mongodb:
+    <<: *service-defaults
+    image: mongo:7.0
+    container_name: parentconnect_marketplace_db
+    volumes:
+      - marketplace_mongo_data:/data/db
+    healthcheck: *mongo-healthcheck
+
+  marketplace-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/marketplace-service
+    image: parentconnect/marketplace-service:1.0
+    container_name: parentconnect_marketplace_service
+    depends_on:
+      marketplace-mongodb:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *shared-env
+      PORT: "8080"
+      NODE_ENV: production
+      MONGODB_URI: mongodb://marketplace-mongodb:27017/parentconnect_marketplace
+      JWT_SECRET: ${MARKETPLACE_JWT_SECRET:?Lancer d'abord scripts/setup}
+      KEYCLOAK_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8180}
+      KEYCLOAK_CLIENT_ID: marketplace-service
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_URI: amqp://${RABBITMQ_USER:-parentconnect}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      RABBITMQ_EXCHANGE: parentconnect.topic
+      APP_NAME: MARKETPLACE-SERVICE
+      # Nom DNS joignable par la Gateway pour l'enregistrement Eureka
+      MARKETPLACE_HOST: marketplace-service
+      # Photos d'annonces téléversées depuis l'ordinateur (volume persistant)
+      UPLOAD_DIR: /data/uploads/marketplace
+    volumes:
+      - marketplace_uploads:/data/uploads/marketplace
+    ports:
+      - "${MARKETPLACE_SERVICE_PORT:-3002}:8080"
+
+  # ===================================================================
+  # MODULE MESSAGERIE (Ameni) — Go / MongoDB + Redis
+  # ===================================================================
+  messaging-mongo:
+    <<: *service-defaults
+    image: mongo:7.0
+    container_name: parentconnect_messaging_db
+    volumes:
+      - messaging_mongo_data:/data/db
+    healthcheck: *mongo-healthcheck
+
+  messaging-redis:
+    <<: *service-defaults
+    image: redis:7.2-alpine
+    container_name: parentconnect_messaging_redis
+    volumes:
+      - messaging_redis_data:/data
+    healthcheck: *redis-healthcheck
+
+  messaging-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/messaging
+    image: parentconnect/messaging-service:1.0
+    container_name: messaging-service
+    depends_on:
+      messaging-mongo:
+        condition: service_healthy
+      messaging-redis:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+      PORT: "8085"
+      APP_ENV: production
+      MONGO_URL: mongodb://messaging-mongo:27017
+      MONGO_DB: messaging_db
+      REDIS_URL: redis://messaging-redis:6379/0
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-parentconnect}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
+      # Vérifie les tokens Keycloak (RS256) avec la clé publique du realm (fichier PEM généré par setup)
+      JWT_ALGORITHM: RS256
+      JWT_PUBLIC_KEY: /run/keys/realm-public.pem
+      INTERNAL_API_KEY: ${MESSAGING_INTERNAL_API_KEY:?Lancer d'abord scripts/setup}
+      EUREKA_ENABLED: "true"
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka
+      SERVICE_NAME: MESSAGING-SERVICE
+      INSTANCE_HOST: messaging-service
+      # Images jointes aux messages (volume persistant, lues uniquement par les participants)
+      UPLOAD_DIR: /data/uploads/messaging
+    volumes:
+      - ./keys/realm-public.pem:/run/keys/realm-public.pem:ro
+      - messaging_uploads:/data/uploads/messaging
+    ports:
+      - "${MESSAGING_SERVICE_PORT:-8007}:8085"
+
+  # ===================================================================
+  # MODULE GÉOLOCALISATION & QUARTIERS (Tasnime) — FastAPI / MongoDB
+  # ===================================================================
+  geo-mongo:
+    <<: *service-defaults
+    image: mongo:7.0
+    container_name: parentconnect_geo_db
+    volumes:
+      - geo_mongo_data:/data/db
+    healthcheck: *mongo-healthcheck
+
+  geo-service:
+    <<: *service-defaults
+    build:
+      context: ./Backend/geo-service
+    image: parentconnect/geo-service:1.0
+    container_name: parentconnect_geo_service
+    depends_on:
+      geo-mongo:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      rabbitmq-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *shared-env
+      PORT: "8080"
+      ENVIRONMENT: production
+      MONGO_URL: mongodb://geo-mongo:27017
+      MONGO_DB: geo_db
+      RABBITMQ_USER: ${RABBITMQ_USER:-parentconnect}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_EXCHANGE: parentconnect.topic
+      RABBITMQ_EVENTS_QUEUE: geo_events_queue
+      JWT_ALGORITHM: RS256
+      INTERNAL_API_KEY: ${GEO_INTERNAL_API_KEY:?Relancer scripts/setup (GEO_INTERNAL_API_KEY manquante)}
+      BLUR_SALT: ${GEO_BLUR_SALT:?Relancer scripts/setup (GEO_BLUR_SALT manquant)}
+      # Rayons proposés dans l'interface : 5, 10 et 20 km
+      MAX_SEARCH_RADIUS_M: "20000"
+      EUREKA_ENABLED: "true"
+      EUREKA_APP_NAME: PARENTCONNECT-GEO-SERVICE
+      EUREKA_INSTANCE_HOST: geo-service
+      EUREKA_INSTANCE_PORT: "8080"
+    ports:
+      - "${GEO_SERVICE_PORT:-8008}:8080"
+
+networks:
+  parentconnect-network:
+    # Nom fixe : les docker-compose.service.yml des membres s'y rattachent (external: true)
+    name: parentconnect-network
+    driver: bridge
+
+volumes:
+  keycloak_storage:
+  rabbitmq_data:
+  event_db_data:
+  participation_db_data:
+  post_db_data:
+  post_uploads:
+  comment_db_data:
+  category_db_data:
+  report_db_data:
+  babysitting_db_data:
+  babysitting_redis_data:
+  marketplace_mongo_data:
+  marketplace_uploads:
+  messaging_mongo_data:
+  messaging_redis_data:
+  messaging_uploads:
+  geo_mongo_data:

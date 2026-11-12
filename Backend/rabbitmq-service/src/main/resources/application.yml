@@ -1,0 +1,23 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: rabbitmq-service
+
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        concurrency: 1
+        max-concurrency: 5
+
+parentconnect:
+  rabbitmq:
+    exchange: ${RABBITMQ_EXCHANGE:parentconnect.topic}
+    queue: ${RABBITMQ_QUEUE:parentconnect.marketplace.queue}
+    routing-key: ${RABBITMQ_ROUTING_KEY:marketplace.#}

@@ -1,0 +1,12 @@
+# Event Service — réglages centralisés (modifiables sans reconstruire l'image : redémarrage du service)
+info:
+  config:
+    service: event-service
+
+app:
+  scheduling:
+    # Passage automatique des événements terminés au statut COMPLETED
+    complete-events:
+      enabled: true
+      interval: PT10M
+      initial-delay: PT1M

@@ -1,0 +1,84 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+!.env.example
+
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+*.rar
+*.zip
+# Dependencies
+/vendor/
+/node_modules/
+
+# Environment files
+.env.backup
+.env.*.local
+
+# Laravel storage & cache
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+!storage/framework/cache/data/.gitkeep
+!storage/framework/sessions/.gitkeep
+!storage/framework/views/.gitkeep
+!storage/logs/.gitkeep
+
+# IDE & OS
+*.swp
+*.swo
+*.log
+# Dependencies
+**/node_modules/
+package-lock.json.bak
+
+# Build outputs
+**/dist/
+**/build/
+**/target/
+**/.angular/
+
+# Environment files
+**/.env
+**/.env.local
+**/.env.*.local
+!**/.env.example
+
+# Logs
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and Editor files
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.opencode/
+
+# OS generated files
+
+# Clés du realm générées par scripts/setup (jamais versionnées)
+keys/

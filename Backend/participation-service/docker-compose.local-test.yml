@@ -1,0 +1,80 @@
+# =====================================================================
+# Participation Service — TEST LOCAL ISOLÉ
+#
+# Mon service + sa base PostgreSQL dédiée, sur un réseau bridge local.
+# Aucune dépendance externe : pas de Gateway, Keycloak, Eureka ni RabbitMQ.
+# Profil "dev" : JWT de test via GET /dev/tokens.
+#
+# Les inscriptions ont besoin d'Event Service : lancer aussi son test local
+# (Backend/event-service/docker-compose.local-test.yml, port 8085). Ce service le joint
+# via la machine hôte (host.docker.internal:8085). Sans lui, /join et /leave répondent 503,
+# le reste (santé, Swagger, /me/joined) fonctionne.
+#
+# Lancement : docker compose -f docker-compose.local-test.yml up -d --build
+# Swagger   : http://localhost:8086/swagger-ui/index.html
+# Santé     : http://localhost:8086/api/health
+# Arrêt     : docker compose -f docker-compose.local-test.yml down   (ajouter -v pour effacer la base)
+# =====================================================================
+name: participation-service-local-test
+
+services:
+
+  participation-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: participations_db
+      POSTGRES_USER: participations_user
+      POSTGRES_PASSWORD: ${PARTICIPATION_DB_PASSWORD:-local-test-password}
+      TZ: Europe/Paris
+      PGTZ: Europe/Paris
+    ports:
+      - "${PARTICIPATION_DB_HOST_PORT:-5434}:5432"
+    volumes:
+      - participation-postgres-local-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U participations_user -d participations_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - local-test
+
+  participation-service:
+    build:
+      context: .
+    image: parentconnect-participation:1.0
+    depends_on:
+      participation-postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: participation-postgres
+      DB_PORT: 5432
+      DB_NAME: participations_db
+      DB_USERNAME: participations_user
+      DB_PASSWORD: ${PARTICIPATION_DB_PASSWORD:-local-test-password}
+      # Même secret qu'Event Service : un token de démo généré par l'un est accepté par l'autre
+      JWT_SECRET: ${JWT_SECRET:-local-test-secret-change-me-0123456789abcdef}
+      KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:-}
+      # Event Service lancé par son propre test local, joint via la machine hôte
+      EVENT_SERVICE_URL: ${EVENT_SERVICE_URL:-http://host.docker.internal:8085}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-test-internal-key}
+      # Pas d'Eureka ni de RabbitMQ en test isolé (les notifications sont journalisées)
+      EUREKA_ENABLED: "false"
+      RABBITMQ_ENABLED: "false"
+      TZ: Europe/Paris
+    extra_hosts:
+      # Nécessaire sous Linux ; déjà fourni par Docker Desktop (Windows / macOS)
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${PARTICIPATION_SERVICE_HOST_PORT:-8086}:8080"
+    networks:
+      - local-test
+
+networks:
+  local-test:
+    driver: bridge
+
+volumes:
+  participation-postgres-local-test-data:

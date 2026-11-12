@@ -1,0 +1,343 @@
+<div class="event-detail-page page-container">
+  <!-- Back navigation -->
+  <nav class="navigation-back">
+    <a routerLink="/app/events" class="btn btn-ghost btn-sm">
+      <span class="material-icons-round">arrow_back</span>
+      <span>Retour aux événements</span>
+    </a>
+  </nav>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="card skeleton hero-skeleton"></div>
+    <div class="card skeleton detail-skeleton"></div>
+  </div>
+
+  <!-- Event Not Found -->
+  <div *ngIf="!isLoading && !event" class="card not-found-card">
+    <span class="material-icons-round not-found-icon">event_busy</span>
+    <h2>Événement introuvable</h2>
+    <p>Cet événement n'existe pas ou a été annulé par son organisateur.</p>
+    <a routerLink="/app/events" class="btn btn-primary">Découvrir d'autres événements</a>
+  </div>
+
+  <!-- Event Content Layout -->
+  <div *ngIf="!isLoading && event && event.status === 'CANCELLED'" class="card cancelled-banner">
+    <span class="material-icons-round">event_busy</span>
+    <div>
+      <strong>Cet événement a été annulé.</strong>
+      <span> Les familles inscrites ont été prévenues par notification.</span>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && event" class="event-layout">
+    <!-- Main Column -->
+    <main class="main-event-content">
+      <!-- Hero Banner Card -->
+      <article class="event-hero-card card">
+        <div class="event-banner-image">
+          <img [src]="event.imageUrl" [alt]="event.title" />
+          <div class="banner-gradient"></div>
+
+          <!-- Category and Price Pills -->
+          <div class="banner-badges">
+            <span class="badge badge-category">{{ getCategoryLabel(event.category) }}</span>
+            <span class="badge badge-free">{{ ageRange() }}</span>
+          </div>
+        </div>
+
+        <div class="hero-body">
+          <div class="date-header-row">
+            <span class="material-icons-round icon-sm text-primary">calendar_today</span>
+            <span class="date-highlight">
+              {{ event.date | date:'EEEE d MMMM yyyy' }} • De {{ event.startTime }} à {{ event.endTime }}
+            </span>
+          </div>
+
+          <h1 class="event-title">{{ event.title }}</h1>
+
+          <!-- Key Highlights Row -->
+          <div class="highlights-grid">
+            <div class="highlight-item">
+              <span class="material-icons-round hl-icon">schedule</span>
+              <div class="hl-content">
+                <span class="hl-title">Horaires</span>
+                <span class="hl-value">{{ event.startTime }} - {{ event.endTime }}</span>
+              </div>
+            </div>
+
+            <div class="highlight-item">
+              <span class="material-icons-round hl-icon">place</span>
+              <div class="hl-content">
+                <span class="hl-title">Lieu</span>
+                <span class="hl-value">{{ event.locationName || event.city }}</span>
+              </div>
+            </div>
+
+            <div class="highlight-item">
+              <span class="material-icons-round hl-icon">groups</span>
+              <div class="hl-content">
+                <span class="hl-title">Participants</span>
+                <span class="hl-value">{{ event.participantCount }} / {{ event.maxParticipants }} familles</span>
+              </div>
+            </div>
+
+            <div class="highlight-item">
+              <span class="material-icons-round hl-icon">child_care</span>
+              <div class="hl-content">
+                <span class="hl-title">Âge des enfants</span>
+                <span class="hl-value">{{ ageRange() }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Description Section -->
+      <section class="description-card card">
+        <h2 class="section-title">À propos de cet événement</h2>
+        <div class="description-text">{{ event.description || 'Aucune description.' }}</div>
+
+        <!-- Good to know bullets -->
+        <div class="tips-box">
+          <h3 class="tips-title">
+            <span class="material-icons-round icon-sm text-primary">info</span>
+            <span>Conseils pratiques pour cette rencontre :</span>
+          </h3>
+          <ul class="tips-list">
+            <li>Les poussettes sont bienvenues (un espace dédié est prévu sur place).</li>
+            <li>Prévoyez le nécessaire de change habituel et une gourde d'eau.</li>
+            <li>En cas d'intempéries pour les sorties extérieures, un message de mise à jour sera envoyé.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Participant List Section -->
+      <section class="participants-section card">
+        <div class="participants-header">
+          <div class="header-left">
+            <span class="material-icons-round text-primary">diversity_3</span>
+            <h2>Familles inscrites ({{ event.participantCount }})</h2>
+          </div>
+          <span class="places-remaining" [class.full]="isEventFull()">
+            {{ isEventFull() ? 'Événement complet' : (event.availablePlaces + ' places restantes') }}
+          </span>
+        </div>
+
+        <!-- Administrateur : liste nominative -->
+        <ng-container *ngIf="isAdmin">
+          <div *ngIf="!event.participants || event.participants.length === 0" class="no-participants">
+            <p>Aucune famille inscrite pour le moment.</p>
+          </div>
+
+          <ng-container *ngIf="event.participants && event.participants.length > 0">
+            <div class="participants-summary">
+              <span><strong>{{ event.participants.length }}</strong> famille(s)</span>
+              <span><strong>{{ totalChildren }}</strong> enfant(s) attendu(s)</span>
+              <button type="button" class="btn btn-secondary btn-sm" (click)="exportParticipants()">
+                <span class="material-icons-round icon-sm">download</span>
+                <span>Exporter (CSV)</span>
+              </button>
+            </div>
+
+            <div class="participants-grid">
+              <div *ngFor="let p of event.participants" class="participant-chip">
+                <div class="avatar avatar-sm participant-avatar">
+                  <span>{{ getInitials(p.name) }}</span>
+                </div>
+                <div class="participant-meta">
+                  <span class="participant-name">{{ p.name }}</span>
+                  <span class="participant-role">
+                    {{ p.childrenCount || 1 }} enfant(s) · inscrit le {{ p.joinedAt | date:'d MMM, HH:mm' }}
+                  </span>
+                  <span *ngIf="p.note" class="participant-note">« {{ p.note }} »</span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+
+        <!-- Parents et autres rôles : résumé (la liste nominative reste privée) -->
+        <div *ngIf="!isAdmin" class="no-participants">
+          <p *ngIf="event.participantCount === 0">Soyez la première famille à rejoindre cet événement !</p>
+          <p *ngIf="event.participantCount > 0">
+            {{ event.participantCount }} famille(s) déjà inscrite(s). La liste des participants est visible par l'organisateur.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Side Actions Column -->
+    <aside class="side-event-column">
+      <!-- Administrateur : gestion de l'événement -->
+      <div *ngIf="isAdmin" class="card registration-card admin-card">
+        <div class="card-status-badge">
+          <span class="status-open">
+            <span class="material-icons-round icon-sm">admin_panel_settings</span>
+            Gestion de l'événement
+          </span>
+        </div>
+
+        <div class="registration-capacity">
+          <div class="capacity-bar-header">
+            <span>Remplissage</span>
+            <strong>{{ event.participantCount }} / {{ event.maxParticipants }} ({{ getCapacityPercentage() }}%)</strong>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" [style.width.%]="getCapacityPercentage()" [class.full]="isEventFull()"></div>
+          </div>
+        </div>
+
+        <a *ngIf="event.status === 'PUBLISHED'" [routerLink]="['/app/events', event.id, 'edit']"
+           class="btn btn-primary w-full btn-action">
+          <span class="material-icons-round">edit</span>
+          <span>Modifier l'événement</span>
+        </a>
+        <button *ngIf="event.status === 'PUBLISHED'" type="button" class="btn btn-danger w-full btn-action"
+                [disabled]="isProcessingAction" (click)="cancelEvent()">
+          <span class="material-icons-round">event_busy</span>
+          <span>Annuler l'événement</span>
+        </button>
+        <p *ngIf="event.status !== 'PUBLISHED'" class="free-cancel-note">
+          <span class="material-icons-round icon-sm">info</span>
+          <span>Événement {{ event.status === 'CANCELLED' ? 'annulé' : 'terminé' }} : plus de modification possible.</span>
+        </p>
+      </div>
+
+      <!-- Parent : inscription -->
+      <div *ngIf="isParent" class="card registration-card">
+        <div class="card-status-badge">
+          <span *ngIf="event.isJoined" class="status-joined">
+            <span class="material-icons-round icon-sm">check_circle</span>
+            Vous participez avec {{ event.myChildrenCount || 1 }} enfant(s)
+          </span>
+          <span *ngIf="!event.isJoined && canRegister && !isEventFull()" class="status-open">
+            <span class="material-icons-round icon-sm">lock_open</span>
+            Inscriptions ouvertes
+          </span>
+          <span *ngIf="!event.isJoined && (isEventFull() || !canRegister)" class="status-full">
+            <span class="material-icons-round icon-sm">block</span>
+            {{ event.status === 'CANCELLED' ? 'Événement annulé' : (hasStarted() ? 'Inscriptions closes' : 'Complet') }}
+          </span>
+        </div>
+
+        <div class="registration-capacity">
+          <div class="capacity-bar-header">
+            <span>Remplissage</span>
+            <strong>{{ getCapacityPercentage() }}%</strong>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" [style.width.%]="getCapacityPercentage()" [class.full]="isEventFull()"></div>
+          </div>
+        </div>
+
+        <!-- Détails de l'inscription -->
+        <div *ngIf="!event.isJoined && canRegister && !isEventFull()" class="join-form">
+          <label for="children-count">Nombre d'enfants qui viennent</label>
+          <select id="children-count" class="form-control" [(ngModel)]="childrenCount">
+            <option *ngFor="let n of childrenOptions" [ngValue]="n">{{ n }} enfant{{ n > 1 ? 's' : '' }}</option>
+          </select>
+
+          <label for="join-note">Message à l'organisateur (facultatif)</label>
+          <textarea id="join-note" class="form-control" rows="3" maxlength="500" [(ngModel)]="note"
+                    placeholder="Allergies, poussette, questions..."></textarea>
+        </div>
+
+        <p *ngIf="event.isJoined && event.myNote" class="my-note">
+          <span class="material-icons-round icon-sm">sticky_note_2</span>
+          <span>« {{ event.myNote }} »</span>
+        </p>
+
+        <button *ngIf="event.isJoined" type="button" class="btn btn-lg w-full btn-action btn-danger"
+                [disabled]="isProcessingAction || hasStarted()" (click)="leave()">
+          <span class="material-icons-round">cancel</span>
+          <span>Annuler ma participation</span>
+        </button>
+        <button *ngIf="!event.isJoined && canRegister" type="button" class="btn btn-lg w-full btn-action"
+                [ngClass]="isEventFull() ? 'btn-secondary' : 'btn-primary'"
+                [disabled]="isEventFull() || isProcessingAction" (click)="join()">
+          <span class="material-icons-round">{{ isEventFull() ? 'lock' : 'check_circle' }}</span>
+          <span>{{ isEventFull() ? 'Complet' : 'Participer à l\'événement' }}</span>
+        </button>
+
+        <p class="free-cancel-note">
+          <span class="material-icons-round icon-sm text-success">verified</span>
+          <span>Gratuit · annulation en 1 clic jusqu'au début de l'événement.</span>
+        </p>
+      </div>
+
+      <!-- Autres rôles (ex. professionnel) : consultation -->
+      <div *ngIf="!isAdmin && !isParent" class="card registration-card">
+        <p class="free-cancel-note">
+          <span class="material-icons-round icon-sm">info</span>
+          <span>Les inscriptions sont réservées aux comptes parents.</span>
+        </p>
+      </div>
+
+      <!-- Map Preview Card -->
+      <div class="card map-preview-card">
+        <div class="map-header">
+          <span class="material-icons-round text-primary">map</span>
+          <h3>Localisation</h3>
+        </div>
+
+        <div class="map-visual-box">
+          <div class="map-pattern-bg"></div>
+          <div class="map-pin-pulse">
+            <span class="material-icons-round pin-icon">location_on</span>
+          </div>
+          <div class="map-badge-bubble">
+            <span>{{ event.city }}</span>
+          </div>
+        </div>
+
+        <div class="map-details">
+          <p class="map-address">
+            <strong *ngIf="event.address">{{ event.address }}<br /></strong>
+            {{ event.city }}
+          </p>
+
+          <a
+            [href]="getGoogleMapsUrl()"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-secondary btn-sm w-full btn-maps"
+          >
+            <span class="material-icons-round icon-sm">open_in_new</span>
+            <span>Ouvrir dans Google Maps</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Organizer Card -->
+      <div class="card organizer-contact-card">
+        <div class="organizer-header">
+          <div class="avatar avatar-md">
+            <img
+              *ngIf="event.organizerAvatar; else orgInitials"
+              [src]="event.organizerAvatar"
+              [alt]="event.organizerName"
+            />
+            <ng-template #orgInitials>
+              <span>{{ getInitials(event.organizerName) }}</span>
+            </ng-template>
+          </div>
+          <div class="organizer-meta">
+            <span class="organizer-role-label">Organisé par</span>
+            <span class="organizer-fullname">{{ event.organizerName }}</span>
+          </div>
+        </div>
+
+        <p class="organizer-note">
+          Une question sur cet événement ou son déroulement ? L'équipe ParentConnect vous répond par la messagerie.
+        </p>
+
+        <a *ngIf="!isAdmin" routerLink="/app/messages" [queryParams]="{ recipient: event.organizerId, event: event.id, title: event.title }"
+           class="btn btn-secondary btn-sm w-full">
+          <span class="material-icons-round icon-sm">chat</span>
+          <span>Contacter l'organisateur</span>
+        </a>
+      </div>
+    </aside>
+  </div>
+</div>

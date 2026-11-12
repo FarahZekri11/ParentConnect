@@ -1,0 +1,242 @@
+.favorites-page {
+  padding-bottom: var(--space-16);
+}
+
+.top-nav-bar {
+  margin-bottom: var(--space-4);
+  .back-link {
+    color: var(--color-text-secondary);
+    &:hover {
+      color: var(--color-primary-dark);
+    }
+  }
+}
+
+.header-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-error);
+  background: var(--color-error-light);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-2);
+}
+
+// --- Favorites Grid ---
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.favorite-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  position: relative;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.fav-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--color-surface-2);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .type-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+  }
+
+  .cond-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  .remove-fav-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-error);
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+
+    &:hover {
+      transform: scale(1.15);
+      background: var(--color-error-light);
+    }
+  }
+}
+
+.card-body {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+
+  .price-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-2);
+
+    .cat-label {
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+      font-weight: 500;
+    }
+
+    .price-val {
+      font-size: var(--font-size-base);
+      font-weight: 700;
+
+      &.badge-donation { color: var(--color-secondary); }
+      &.badge-sale { color: var(--color-primary-dark); }
+      &.badge-lending { color: var(--color-accent); }
+      &.badge-exchange { color: var(--color-warning); }
+    }
+  }
+
+  .card-title {
+    font-size: var(--font-size-md);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: var(--space-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-desc {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-bottom: var(--space-4);
+    min-height: 2.8em;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border-light);
+
+    .owner-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      .owner-name {
+        font-size: var(--font-size-xs);
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+    }
+
+    .location-tag {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-secondary);
+    }
+  }
+}
+
+// --- Empty State ---
+.empty-state-box {
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 480px;
+  margin: var(--space-8) auto;
+
+  .empty-icon-wrap {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: var(--color-error-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-error);
+  }
+
+  h3 {
+    font-size: var(--font-size-lg);
+  }
+
+  p {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+}
+
+// --- Skeleton Loader ---
+.fav-skeleton-card {
+  padding: 0;
+  overflow: hidden;
+
+  .thumb-skel {
+    width: 100%;
+    aspect-ratio: 16 / 10;
+  }
+
+  .skeleton-body {
+    padding: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+
+    .title-skel {
+      width: 70%;
+      height: 20px;
+    }
+
+    .line-skel {
+      width: 100%;
+      height: 36px;
+    }
+  }
+}

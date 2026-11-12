@@ -1,0 +1,161 @@
+<div class="my-bookings-page">
+  <div class="top-nav">
+    <a routerLink="/app/babysitting" class="back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour aux demandes de garde
+    </a>
+  </div>
+
+  <div class="page-header">
+    <div>
+      <h1>Mes gardes</h1>
+      <p class="subtitle">Suivez les gardes que vous demandez et celles que vous assurez.</p>
+    </div>
+    <div class="credit-summary card" *ngIf="credits" [class.negative]="credits.balance < 0">
+      <span class="material-icons-round">hourglass_bottom</span>
+      <div>
+        <strong>{{ credits.balance | number:'1.0-1':'fr' }} h</strong>
+        <span>{{ isSitter ? 'heures de garde effectuées' : 'solde d\'heures de garde' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs-row">
+    <button class="tab-btn" [class.active]="tab === 'BOOKINGS'" (click)="tab = 'BOOKINGS'">
+      <span class="material-icons-round icon-sm">event_available</span> Gardes ({{ activeBookings.length }})
+    </button>
+    <button *ngIf="showRequests" class="tab-btn" [class.active]="tab === 'REQUESTS'" (click)="tab = 'REQUESTS'">
+      <span class="material-icons-round icon-sm">pending_actions</span> Mes demandes ({{ requests.length }})
+    </button>
+    <button *ngIf="showAvailability" class="tab-btn" [class.active]="tab === 'AVAILABILITY'" (click)="tab = 'AVAILABILITY'">
+      <span class="material-icons-round icon-sm">schedule</span> Mes disponibilités ({{ slots.length }})
+    </button>
+    <button class="tab-btn" [class.active]="tab === 'CREDITS'" (click)="tab = 'CREDITS'">
+      <span class="material-icons-round icon-sm">savings</span> Heures
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="card skeleton" style="height: 220px"></div>
+
+  <ng-container *ngIf="!loading">
+    <!-- Gardes -->
+    <section *ngIf="tab === 'BOOKINGS'" class="list-section">
+      <p *ngIf="bookings.length === 0" class="empty-text card">
+        Aucune garde pour le moment. Publiez une demande ou proposez votre aide à un parent.
+      </p>
+
+      <div *ngFor="let b of activeBookings.concat(pastBookings)" class="booking-card card">
+        <div class="booking-main">
+          <span class="role-pill" [class.sitter]="b.role === 'BABYSITTER'">
+            {{ b.role === 'REQUESTER' ? 'Je fais garder' : 'Je garde' }}
+          </span>
+          <h3>{{ formatDate(b.date) }} · {{ b.startTime }}–{{ b.endTime }}</h3>
+          <p class="booking-meta">
+            {{ b.hours | number:'1.0-1':'fr' }} h ·
+            {{ b.role === 'REQUESTER' ? 'coût' : 'gain' }} {{ b.hours | number:'1.0-1':'fr' }} crédit(s)
+          </p>
+        </div>
+        <span class="status-badge" [ngClass]="statusClass(b.status)">{{ statusLabel(b.status) }}</span>
+
+        <div class="booking-actions">
+          <p *ngIf="b.status === 'PENDING' && b.role === 'BABYSITTER'" class="hint">En attente de confirmation par le parent.</p>
+          <button *ngIf="b.status === 'PENDING' && b.role === 'REQUESTER'" class="btn btn-primary btn-sm"
+                  [disabled]="busyId === b.id" (click)="confirm(b)">Confirmer la garde</button>
+          <button *ngIf="b.status === 'ACCEPTED'" class="btn btn-primary btn-sm"
+                  [disabled]="busyId === b.id" (click)="complete(b)">Marquer terminée</button>
+          <button *ngIf="b.status === 'PENDING' || b.status === 'ACCEPTED'" class="btn btn-secondary btn-sm"
+                  [disabled]="busyId === b.id" (click)="cancel(b)">Annuler</button>
+          <button *ngIf="b.status === 'COMPLETED' && !rated.has(b.id)" class="btn btn-secondary btn-sm"
+                  (click)="openRating(b)">
+            <span class="material-icons-round icon-sm">star</span> Noter
+          </button>
+          <a *ngIf="b.status === 'PENDING' || b.status === 'ACCEPTED'" routerLink="/app/messages" class="btn btn-ghost btn-sm">
+            <span class="material-icons-round icon-sm">chat</span> Messagerie
+          </a>
+        </div>
+
+        <!-- Notation -->
+        <div *ngIf="ratingBooking?.id === b.id" class="rating-box">
+          <div class="stars">
+            <button *ngFor="let s of [1, 2, 3, 4, 5]" type="button" class="star-btn" (click)="ratingScore = s"
+                    [attr.aria-label]="s + ' étoile(s)'">
+              <span class="material-icons-round">{{ s <= ratingScore ? 'star' : 'star_border' }}</span>
+            </button>
+          </div>
+          <textarea class="form-control" rows="2" maxlength="500" [(ngModel)]="ratingComment"
+                    placeholder="Un mot sur la garde (facultatif)"></textarea>
+          <div class="booking-actions">
+            <button class="btn btn-primary btn-sm" [disabled]="busyId === b.id" (click)="submitRating()">Envoyer</button>
+            <button class="btn btn-ghost btn-sm" (click)="ratingBooking = null">Annuler</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Demandes -->
+    <section *ngIf="tab === 'REQUESTS'" class="list-section">
+      <p *ngIf="requests.length === 0" class="empty-text card">
+        Vous n'avez publié aucune demande. <a routerLink="/app/babysitting/new-request">Demander une garde</a>
+      </p>
+      <div *ngFor="let r of requests" class="booking-card card">
+        <div class="booking-main">
+          <h3>{{ formatDate(r.date) }} · {{ r.startTime }}–{{ r.endTime }}</h3>
+          <p class="booking-meta">{{ r.neighborhood }} · {{ r.numChildren }} enfant(s) ({{ r.childAgeRanges.join(', ') }} ans)</p>
+        </div>
+        <span class="status-badge" [ngClass]="statusClass(r.status)">{{ statusLabel(r.status) }}</span>
+        <div *ngIf="r.status === 'OPEN'" class="request-actions">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="editRequest(r)" [disabled]="busyId === r.id">
+            <span class="material-icons-round icon-sm">edit</span> Modifier
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm danger-text" (click)="deleteRequest(r)" [disabled]="busyId === r.id">
+            <span class="material-icons-round icon-sm">delete_outline</span> Supprimer
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Disponibilités -->
+    <section *ngIf="tab === 'AVAILABILITY'" class="list-section">
+      <div class="card slot-form">
+        <h3>Ajouter une disponibilité</h3>
+        <div class="slot-grid">
+          <select class="form-control" [(ngModel)]="newSlot.isRecurring">
+            <option [ngValue]="true">Chaque semaine</option>
+            <option [ngValue]="false">Date précise</option>
+          </select>
+          <select *ngIf="newSlot.isRecurring" class="form-control" [(ngModel)]="newSlot.dayOfWeek">
+            <option *ngFor="let d of weekDays; let i = index" [ngValue]="i">{{ d }}</option>
+          </select>
+          <input *ngIf="!newSlot.isRecurring" type="date" class="form-control" [(ngModel)]="newSlot.date" />
+          <input type="time" class="form-control" [(ngModel)]="newSlot.startTime" />
+          <input type="time" class="form-control" [(ngModel)]="newSlot.endTime" />
+          <input type="text" class="form-control" placeholder="Quartier" [(ngModel)]="newSlot.neighborhood" />
+          <button type="button" class="btn btn-primary" (click)="addSlot()">Ajouter</button>
+        </div>
+      </div>
+      <p *ngIf="slots.length === 0" class="empty-text card">
+        Déclarez quand vous pouvez garder des enfants : les parents qui ont besoin d'aide à ces moments-là vous verront.
+      </p>
+      <div *ngFor="let s of slots" class="booking-card card">
+        <div class="booking-main"><h3>{{ slotLabel(s) }}</h3></div>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="removeSlot(s)">
+          <span class="material-icons-round icon-sm">delete_outline</span> Supprimer
+        </button>
+      </div>
+    </section>
+
+    <!-- Crédits -->
+    <section *ngIf="tab === 'CREDITS'" class="list-section">
+      <p *ngIf="!credits || credits.transactions.length === 0" class="empty-text card">
+        Aucun mouvement. Chaque garde terminée est comptabilisée ici en heures.
+      </p>
+      <div *ngFor="let t of credits?.transactions" class="booking-card card">
+        <div class="booking-main">
+          <h3>{{ t.type === 'EARN' ? 'Garde assurée' : (t.type === 'SPEND' ? 'Garde reçue' : 'Ajustement') }}</h3>
+          <p class="booking-meta">{{ t.createdAt | date:'d MMM yyyy, HH:mm':'':'fr' }} · solde après : {{ t.balanceAfter | number:'1.0-1':'fr' }} h</p>
+        </div>
+        <span class="amount" [class.positive]="t.amount > 0">{{ t.amount > 0 ? '+' : '' }}{{ t.amount | number:'1.0-1':'fr' }} h</span>
+      </div>
+    </section>
+  </ng-container>
+</div>

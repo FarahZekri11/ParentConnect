@@ -1,0 +1,18 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: feign-consumer-service
+
+marketplace:
+  service:
+    url: http://localhost:3002
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+# Keycloak Token Validation (Optional for consumer protection)
+spring.security.oauth2.resourceserver.jwt.issuer-uri: http://localhost:8180/realms/parentconnect

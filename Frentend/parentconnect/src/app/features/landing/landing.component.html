@@ -1,0 +1,297 @@
+<div class="landing">
+  <div class="landing-video-bg" aria-hidden="true">
+    <video #bgVideo
+           autoplay
+           [muted]="true"
+           muted="muted"
+           loop
+           playsinline
+           preload="auto"
+           poster="/ph1.jpg"
+           class="landing-video">
+      <source src="video.mp4" type="video/mp4">
+    </video>
+    <div class="landing-video-veil"></div>
+  </div>
+
+  <div class="landing-glow" aria-hidden="true"></div>
+
+  <nav class="landing-nav">
+    <a routerLink="/" class="nav-brand">
+      <img src="/logo2.png" alt="ParentConnect" class="brand-logo-img" />
+      <span class="brand-name">ParentConnect</span>
+    </a>
+
+    <div class="nav-links">
+      <a href="#modules" class="nav-link">Les modules</a>
+      <a href="#comment" class="nav-link">Comment ça marche</a>
+      <a href="#temoignages" class="nav-link">Témoignages</a>
+    </div>
+
+    <div class="nav-actions">
+      <ng-container *ngIf="!authService.isLoggedIn; else loggedInNav">
+        <a routerLink="/auth/login" class="btn btn-ghost btn-sm">Se connecter</a>
+        <a routerLink="/auth/register" class="btn btn-primary btn-sm">Créer un compte</a>
+      </ng-container>
+      <ng-template #loggedInNav>
+        <a routerLink="/app/dashboard" class="btn btn-primary btn-sm">Accéder à mon espace</a>
+      </ng-template>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <span class="hero-eyebrow">
+        <span class="eyebrow-dot" aria-hidden="true"></span>
+        Paris 11e · Oberkampf
+      </span>
+
+      <h1 class="hero-title">
+        Le quartier qui<br />
+        veille sur <em>vos enfants</em>.
+      </h1>
+
+      <p class="hero-desc">
+        ParentConnect réunit les familles d'un même quartier pour s'entraider au quotidien :
+        matériel qui circule, gardes de confiance, conseils sincères et rendez-vous entre voisins.
+      </p>
+
+      <div class="hero-cta">
+        <ng-container *ngIf="!authService.isLoggedIn; else loggedInCta">
+          <a routerLink="/auth/register" class="btn btn-primary btn-lg">
+            Rejoindre mon quartier
+            <span class="material-icons-round icon-sm" aria-hidden="true">arrow_forward</span>
+          </a>
+          <a routerLink="/auth/login" class="btn btn-secondary btn-lg">
+            Explorer la plateforme
+          </a>
+        </ng-container>
+        <ng-template #loggedInCta>
+          <a routerLink="/app/dashboard" class="btn btn-primary btn-lg">
+            Accéder à mon espace
+            <span class="material-icons-round icon-sm" aria-hidden="true">arrow_forward</span>
+          </a>
+        </ng-template>
+      </div>
+
+      <div class="hero-proof">
+        <div class="proof-avatars" aria-hidden="true">
+          <span class="proof-avatar">CR</span>
+          <span class="proof-avatar">MV</span>
+          <span class="proof-avatar">EJ</span>
+          <span class="proof-avatar proof-avatar--more">+</span>
+        </div>
+        <p class="proof-text">
+          <strong>2 400 parents</strong> déjà présents dans <strong>120 quartiers</strong>
+        </p>
+      </div>
+    </div>
+
+    <div class="hero-media">
+      <div class="media-frame">
+        <img src="/ph2.jpg"
+             alt="Des parents et leurs enfants réunis au square du quartier"
+             class="media-photo" />
+        <div class="media-tint"></div>
+        <span class="media-caption">
+          <span class="material-icons-round icon-sm" aria-hidden="true">place</span>
+          Square Maurice Gardette
+        </span>
+
+        <button type="button" class="media-control" (click)="togglePlay()" [title]="isPlaying ? 'Mettre la vidéo de fond en pause' : 'Lire la vidéo de fond'" [attr.aria-label]="isPlaying ? 'Mettre la vidéo de fond en pause' : 'Lire la vidéo de fond'" [attr.aria-pressed]="isPlaying">
+          <span class="material-icons-round icon-sm" aria-hidden="true">{{isPlaying ? 'pause' : 'play_arrow'}}</span>
+        </button>
+      </div>
+
+      <div class="hero-card hero-card--listing">
+        <span class="hero-card-icon hero-card-icon--sage">
+          <span class="material-icons-round icon-sm" aria-hidden="true">stroller</span>
+        </span>
+        <div>
+          <p class="hero-card-title">Poussette Cybex</p>
+          <p class="hero-card-meta">À prêter · à 300 m</p>
+        </div>
+      </div>
+
+      <div class="hero-card hero-card--sitter">
+        <span class="hero-card-icon hero-card-icon--terracotta">
+          <span class="material-icons-round icon-sm" aria-hidden="true">child_care</span>
+        </span>
+        <div>
+          <p class="hero-card-title">Garde ce samedi</p>
+          <p class="hero-card-meta">9h – 18h · 4,9 ★</p>
+        </div>
+      </div>
+
+      <div class="hero-card hero-card--post">
+        <span class="hero-card-icon hero-card-icon--plum">
+          <span class="material-icons-round icon-sm" aria-hidden="true">forum</span>
+        </span>
+        <div>
+          <p class="hero-card-title">Bonne adresse de pédiatre ?</p>
+          <p class="hero-card-meta">12 réponses · il y a 2 h</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span>Donner une seconde vie aux objets</span>
+      <span class="ticker-sep">✳</span>
+      <span>Des gardes recommandées par les voisins</span>
+      <span class="ticker-sep">✳</span>
+      <span>Des conseils sans jugement</span>
+      <span class="ticker-sep">✳</span>
+      <span>Des rendez-vous à deux pas</span>
+      <span class="ticker-sep">✳</span>
+    </div>
+  </div>
+
+  <section class="stats-section">
+    <div class="stats-grid">
+      <div *ngFor="let stat of stats; let i = index" class="stat-item">
+        <span class="stat-index">0{{ i + 1 }}</span>
+        <p class="stat-value">{{stat.value}}</p>
+        <p class="stat-label">{{stat.label}}</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="modules" class="modules-section">
+    <div class="section-head">
+      <span class="eyebrow">Tout en un</span>
+      <h2>Six essentiels pour la vie<br />de famille du quartier</h2>
+      <p class="section-lede">
+        Une seule plateforme, pensée avec des parents, pour alléger le quotidien sans perdre le lien humain.
+      </p>
+    </div>
+
+    <div class="modules-grid">
+      <article *ngFor="let f of features; let i = index" class="module-card">
+        <div class="module-top">
+          <span class="module-icon" [style.color]="f.color" [style.background]="f.light">
+            <span class="material-icons-round" aria-hidden="true">{{f.icon}}</span>
+          </span>
+          <span class="module-index">0{{ i + 1 }}</span>
+        </div>
+        <h3 class="module-title">{{f.title}}</h3>
+        <p class="module-desc">{{f.desc}}</p>
+        <span class="module-link">
+          Découvrir
+          <span class="material-icons-round icon-xs" aria-hidden="true">arrow_forward</span>
+        </span>
+      </article>
+    </div>
+  </section>
+
+  <section id="comment" class="how-section">
+    <div class="how-inner">
+      <div class="how-copy">
+        <span class="eyebrow">Simple comme bonjour</span>
+        <h2>Trois pas pour entrer<br />dans le quartier</h2>
+        <p class="section-lede">
+          Pas de profil interminable, pas d'algorithme obscur. Juste des familles proches de vous.
+        </p>
+        <a routerLink="/auth/register" class="btn btn-primary">Créer mon compte</a>
+      </div>
+
+      <ol class="steps">
+        <li *ngFor="let step of steps" class="step">
+          <span class="step-num">{{ step.num }}</span>
+          <div class="step-body">
+            <h3 class="step-title">{{ step.title }}</h3>
+            <p class="step-desc">{{ step.desc }}</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="temoignages" class="voices-section">
+    <div class="section-head section-head--left">
+      <span class="eyebrow">Ils s'entraident déjà</span>
+      <h2>Le quartier en parle<br />mieux que nous.</h2>
+    </div>
+
+    <div class="voices-grid">
+      <figure class="voice voice--lead">
+        <blockquote>
+          « En trois jours, nous avons trouvé un lit parapluie à deux rues et une baby-sitter
+          que trois voisines connaissaient déjà. C'est exactement ce qui manquait à notre
+          quotidien. »
+        </blockquote>
+        <figcaption class="voice-author">
+          <span class="voice-avatar voice-avatar--plum">CR</span>
+          <div>
+            <span class="voice-name">Camille R.</span>
+            <span class="voice-role">Maman de 2 enfants · Oberkampf</span>
+          </div>
+        </figcaption>
+      </figure>
+
+      <div class="voice-stack">
+        <figure class="voice">
+          <blockquote>
+            « Le forum m'a sauvée plus d'une fois. On y pose les vraies questions, sans
+            la peur du jugement. »
+          </blockquote>
+          <figcaption class="voice-author">
+            <span class="voice-avatar voice-avatar--sage">MV</span>
+            <div>
+              <span class="voice-name">Marc V.</span>
+              <span class="voice-role">Papa d'une fille de 18 mois</span>
+            </div>
+          </figcaption>
+        </figure>
+
+        <figure class="voice">
+          <blockquote>
+            « Nous prêtons les affaires de nos enfants plutôt que de les stocker. Le week-end
+            de la bourse aux jouets a été un vrai moment de quartier. »
+          </blockquote>
+          <figcaption class="voice-author">
+            <span class="voice-avatar voice-avatar--terracotta">EJ</span>
+            <div>
+              <span class="voice-name">Émilie &amp; Julien</span>
+              <span class="voice-role">Parents de 3 enfants · Saint-Ambroise</span>
+            </div>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="cta-card">
+      <div class="cta-copy">
+        <span class="cta-eyebrow">Gratuit · local · bienveillant</span>
+        <h2>Votre quartier n'attend<br />que vous.</h2>
+        <p>
+          Créez votre compte en une minute et découvrez les familles, les objets et les
+          rendez-vous déjà là, tout près.
+        </p>
+      </div>
+      <div class="cta-actions">
+        <a routerLink="/auth/register" class="btn btn-lg cta-btn">
+          Rejoindre ParentConnect
+          <span class="material-icons-round icon-sm" aria-hidden="true">arrow_forward</span>
+        </a>
+        <span class="cta-note">Sans engagement · Données protégées</span>
+      </div>
+    </div>
+  </section>
+
+  <footer class="landing-footer">
+    <div class="footer-brand">
+      <img src="/logo2.png" alt="" class="footer-logo-img" />
+      <span class="footer-name">ParentConnect</span>
+    </div>
+    <nav class="footer-links" aria-label="Liens de pied de page">
+      <a href="#modules">Modules</a>
+      <a href="#comment">Comment ça marche</a>
+      <a href="#temoignages">Témoignages</a>
+    </nav>
+    <p class="footer-legal">© 2026 ParentConnect — Fait avec soin à Paris</p>
+  </footer>
+</div>

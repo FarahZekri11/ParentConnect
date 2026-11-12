@@ -1,0 +1,101 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg);
+  position: relative;
+  isolation: isolate;
+
+  &.sidebar-collapsed .layout-body { margin-left: 0; }
+
+  &::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(1200px 600px at 78% -10%, rgba(194, 112, 63, 0.10), transparent 70%),
+      radial-gradient(900px 500px at 8% 105%, rgba(46, 92, 78, 0.08), transparent 70%);
+  }
+
+  &::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.35;
+    background-image: radial-gradient(rgba(58, 42, 30, 0.10) 0.5px, transparent 0.5px);
+    background-size: 5px 5px;
+  }
+}
+
+.layout-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: var(--sidebar-width);
+  transition: margin-left var(--transition-base);
+  background: transparent;
+
+  @media (max-width: 1023px) {
+    margin-left: 0;
+    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: rgba(36, 30, 26, 0.38);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: fadeIn var(--transition-fast) ease both;
+}
+
+.layout-bg-slider {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bg-slide {
+  position: absolute;
+  inset: -8%;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1.06);
+  filter: saturate(0.8) blur(2px);
+  transition: opacity 1.6s ease-in-out, transform 10s ease-out;
+
+  &.active {
+    opacity: 0.14;
+    transform: scale(1);
+  }
+}
+
+.layout-bg-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(245, 238, 228, 0.94) 0%, rgba(245, 238, 228, 0.97) 60%, rgba(245, 238, 228, 0.99) 100%),
+    radial-gradient(900px 500px at 50% 0%, rgba(255, 252, 246, 0.5), transparent 70%);
+  pointer-events: none;
+}
+
+.layout-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  background: transparent;
+}

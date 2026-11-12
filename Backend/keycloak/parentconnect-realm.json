@@ -1,0 +1,254 @@
+{
+  "realm": "parentconnect",
+  "enabled": true,
+  "displayName": "ParentConnect Community Platform",
+  "sslRequired": "none",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "USER",
+        "description": "ParentConnect standard user role"
+      },
+      {
+        "name": "ADMIN",
+        "description": "ParentConnect administrator role"
+      },
+      {
+        "name": "PARENT",
+        "description": "Parent membre de la communauté ParentConnect"
+      },
+      {
+        "name": "PROFESSIONAL",
+        "description": "Professionnel de l'enfance (babysitter, éducateur...)"
+      }
+    ],
+    "client": {
+      "marketplace-service": [
+        {
+          "name": "MANAGE_LISTINGS",
+          "description": "Manage community listings"
+        },
+        {
+          "name": "BORROW_ITEMS",
+          "description": "Borrow equipment"
+        }
+      ]
+    }
+  },
+  "groups": [],
+  "defaultRoles": [
+    "USER",
+    "PARENT",
+    "offline_access",
+    "uma_authorization"
+  ],
+  "clients": [
+    {
+      "clientId": "marketplace-service",
+      "name": "Marketplace Microservice Resource Server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false
+    },
+    {
+      "clientId": "api-gateway",
+      "name": "ParentConnect API Gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://localhost:8080"
+      ]
+    },
+    {
+      "clientId": "frontend-parentconnect",
+      "name": "Angular Frontend Application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://localhost:8080"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@parentconnect.local",
+      "firstName": "Admin",
+      "lastName": "ParentConnect",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "ADMIN"
+      ],
+      "clientRoles": {
+        "marketplace-service": [
+          "MANAGE_LISTINGS",
+          "BORROW_ITEMS"
+        ]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000002",
+      "username": "farah",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "farah@parentconnect.local",
+      "firstName": "Farah",
+      "lastName": "Zekri",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "ADMIN"
+      ],
+      "clientRoles": {
+        "marketplace-service": [
+          "MANAGE_LISTINGS",
+          "BORROW_ITEMS"
+        ]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000003",
+      "username": "parent_test",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "marie.l@email.com",
+      "firstName": "Marie",
+      "lastName": "Lambert",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "PARENT"
+      ],
+      "clientRoles": {
+        "marketplace-service": [
+          "BORROW_ITEMS"
+        ]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000004",
+      "username": "parent2_test",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "paul.d@email.com",
+      "firstName": "Paul",
+      "lastName": "Durand",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "PARENT"
+      ],
+      "clientRoles": {
+        "marketplace-service": [
+          "BORROW_ITEMS"
+        ]
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000005",
+      "username": "pro_test",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "sophie.b@email.com",
+      "firstName": "Sophie",
+      "lastName": "Bernard",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${KC_DEMO_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "PROFESSIONAL"
+      ],
+      "clientRoles": {
+        "marketplace-service": [
+          "BORROW_ITEMS"
+        ]
+      }
+    }
+  ],
+  "accessTokenLifespan": 1800,
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "parentconnect-rsa",
+        "providerId": "rsa",
+        "subComponents": {},
+        "config": {
+          "privateKey": [
+            "${KC_REALM_PRIVATE_KEY}"
+          ],
+          "active": [
+            "true"
+          ],
+          "enabled": [
+            "true"
+          ],
+          "priority": [
+            "200"
+          ],
+          "algorithm": [
+            "RS256"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,213 @@
+<div class="admin-page">
+  <header class="page-header">
+    <div>
+      <div class="eyebrow"><span class="material-icons-round icon-sm">admin_panel_settings</span> Administration</div>
+      <h1>Tableau de bord administrateur</h1>
+      <p class="subtitle">Données réelles des comptes Keycloak et de chaque microservice.
+        <span *ngIf="stats">Mise à jour : {{ stats.generatedAt | date:'d MMM yyyy, HH:mm':'':'fr' }}</span></p>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" (click)="loadStats()" [disabled]="loadingStats">
+      <span class="material-icons-round icon-sm">refresh</span> Actualiser
+    </button>
+  </header>
+
+  <nav class="tabs">
+    <button type="button" [class.active]="tab === 'dashboard'" (click)="selectTab('dashboard')">
+      <span class="material-icons-round icon-sm">insights</span> Statistiques
+    </button>
+    <button type="button" [class.active]="tab === 'users'" (click)="selectTab('users')">
+      <span class="material-icons-round icon-sm">manage_accounts</span> Utilisateurs
+    </button>
+    <button type="button" [class.active]="tab === 'moderation'" (click)="selectTab('moderation')">
+      <span class="material-icons-round icon-sm">gavel</span> Modération
+    </button>
+  </nav>
+
+  <!-- ===================================================== statistiques -->
+  <ng-container *ngIf="tab === 'dashboard'">
+    <div *ngIf="loadingStats" class="kpi-grid">
+      <div *ngFor="let i of [1,2,3,4,5,6,7,8]" class="card kpi skeleton-card"></div>
+    </div>
+    <p *ngIf="statsError && !loadingStats" class="card empty">Statistiques indisponibles. Vérifiez que la plateforme est démarrée.</p>
+
+    <ng-container *ngIf="stats && !loadingStats">
+      <p *ngIf="unavailableModules.length" class="warning-line">
+        <span class="material-icons-round icon-sm">warning</span>
+        Module(s) sans réponse : {{ unavailableModules.join(', ') }} — leurs compteurs sont affichés « – ».
+      </p>
+
+      <div class="kpi-grid">
+        <div *ngFor="let k of kpis" class="card kpi" [attr.data-tone]="k.tone">
+          <span class="material-icons-round kpi-icon">{{ k.icon }}</span>
+          <div>
+            <strong>{{ k.value }}</strong>
+            <span class="kpi-label">{{ k.label }}</span>
+            <span *ngIf="k.hint" class="kpi-hint">{{ k.hint }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <!-- Inscriptions -->
+        <section class="card chart-card wide">
+          <h2>Inscriptions sur 30 jours <span class="muted">({{ registrationsTotal }})</span></h2>
+          <div class="bar-chart" role="img" [attr.aria-label]="'Inscriptions par jour, total ' + registrationsTotal">
+            <div *ngFor="let r of registrations; let i = index" class="bar-col" [title]="shortDate(r.date) + ' : ' + r.count">
+              <div class="bar" [style.height.%]="barHeight(r.count)" [class.zero]="!r.count"></div>
+              <span class="bar-label" *ngIf="i % 5 === 0 || i === registrations.length - 1">{{ shortDate(r.date) }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Répartition -->
+        <section class="card chart-card">
+          <h2>Parents / Babysitters</h2>
+          <div class="donut-wrap">
+            <div class="donut" [style.background]="split.gradient"><div class="donut-hole">{{ split.parents + split.sitters }}</div></div>
+            <ul class="legend">
+              <li><i class="sw parent"></i> Parents : <strong>{{ split.parents }}</strong> ({{ split.parentPct }} %)</li>
+              <li><i class="sw sitter"></i> Babysitters : <strong>{{ split.sitters }}</strong> ({{ split.parents + split.sitters ? 100 - split.parentPct : 0 }} %)</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Activité par module -->
+        <section class="card chart-card">
+          <h2>Activité par module</h2>
+          <div class="hbars">
+            <div *ngFor="let b of activityBars" class="hbar-row">
+              <span class="hbar-label">{{ b.label }}</span>
+              <div class="hbar-track"><div class="hbar" [attr.data-tone]="b.tone" [style.width.%]="(b.value / maxActivity) * 100"></div></div>
+              <span class="hbar-value">{{ b.value }}</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card table-card">
+        <h2>Inscriptions récentes</h2>
+        <table class="data-table">
+          <thead><tr><th>Nom</th><th>E-mail</th><th>Rôle</th><th>Inscription</th><th>Statut</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let u of stats.users.recent">
+              <td>{{ fullName(u) }}</td>
+              <td>{{ u.email || '–' }}</td>
+              <td><span class="role-badge" [attr.data-role]="u.role">{{ roleLabel(u.role) }}</span></td>
+              <td>{{ formatDate(u.createdTimestamp) }}</td>
+              <td>{{ u.enabled ? 'Actif' : 'Suspendu' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </ng-container>
+  </ng-container>
+
+  <!-- ===================================================== utilisateurs -->
+  <ng-container *ngIf="tab === 'users'">
+    <div class="card toolbar">
+      <div class="search-box">
+        <span class="material-icons-round icon-sm">search</span>
+        <input type="search" [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Nom, prénom, e-mail..." aria-label="Rechercher un utilisateur" />
+      </div>
+      <select class="form-control role-select" [(ngModel)]="roleFilter" (ngModelChange)="page = 0; loadUsers()" aria-label="Filtrer par rôle">
+        <option value="">Tous les rôles</option>
+        <option *ngFor="let r of roles" [value]="r.value">{{ r.label }}</option>
+        <option value="PROFESSIONAL">Professionnel</option>
+      </select>
+      <span class="muted">{{ totalUsers }} compte(s)</span>
+    </div>
+
+    <div class="card table-card">
+      <p *ngIf="loadingUsers" class="muted">Chargement...</p>
+      <table *ngIf="!loadingUsers" class="data-table">
+        <thead><tr><th>Utilisateur</th><th>Rôle</th><th>Inscription</th><th>Statut</th><th class="actions-col">Actions</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let u of users" [class.disabled-row]="!u.enabled">
+            <td>
+              <ng-container *ngIf="editing?.id === u.id; else showUser">
+                <div class="edit-grid">
+                  <input class="form-control" [(ngModel)]="editing!.firstName" placeholder="Prénom" maxlength="50" />
+                  <input class="form-control" [(ngModel)]="editing!.lastName" placeholder="Nom" maxlength="50" />
+                  <input class="form-control" type="email" [(ngModel)]="editing!.email" placeholder="E-mail" />
+                </div>
+              </ng-container>
+              <ng-template #showUser>
+                <strong>{{ fullName(u) }}</strong> <span *ngIf="u.id === myId" class="me-badge">vous</span>
+                <span class="muted block">{{ u.email || u.username }}</span>
+              </ng-template>
+            </td>
+            <td>
+              <select class="form-control role-select" [ngModel]="u.role" (ngModelChange)="changeRole(u, $event)"
+                      [disabled]="busyUserId === u.id || u.id === myId" [attr.aria-label]="'Rôle de ' + fullName(u)">
+                <option *ngIf="!u.role || u.role === 'PROFESSIONAL'" [ngValue]="u.role">{{ roleLabel(u.role) }}</option>
+                <option *ngFor="let r of roles" [ngValue]="r.value">{{ r.label }}</option>
+              </select>
+            </td>
+            <td>{{ formatDate(u.createdTimestamp) }}</td>
+            <td><span class="status" [class.off]="!u.enabled">{{ u.enabled ? 'Actif' : 'Suspendu' }}</span></td>
+            <td class="actions-col">
+              <ng-container *ngIf="editing?.id === u.id; else rowActions">
+                <button type="button" class="btn btn-primary btn-sm" (click)="saveEdit()" [disabled]="busyUserId === u.id">Enregistrer</button>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="editing = null">Annuler</button>
+              </ng-container>
+              <ng-template #rowActions>
+                <button type="button" class="icon-btn" title="Modifier" (click)="startEdit(u)"><span class="material-icons-round">edit</span></button>
+                <button type="button" class="icon-btn" [title]="u.enabled ? 'Suspendre' : 'Réactiver'" (click)="toggleEnabled(u)"
+                        [disabled]="busyUserId === u.id || u.id === myId">
+                  <span class="material-icons-round">{{ u.enabled ? 'block' : 'check_circle' }}</span>
+                </button>
+                <button type="button" class="icon-btn danger" title="Supprimer" (click)="deleteUser(u)" [disabled]="busyUserId === u.id || u.id === myId">
+                  <span class="material-icons-round">delete</span>
+                </button>
+              </ng-template>
+            </td>
+          </tr>
+          <tr *ngIf="!users.length"><td colspan="5" class="muted">Aucun utilisateur ne correspond.</td></tr>
+        </tbody>
+      </table>
+      <div class="pager" *ngIf="pageCount > 1">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="goToPage(page - 1)" [disabled]="page === 0">Précédent</button>
+        <span>Page {{ page + 1 }} / {{ pageCount }}</span>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="goToPage(page + 1)" [disabled]="page + 1 >= pageCount">Suivant</button>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ===================================================== modération -->
+  <ng-container *ngIf="tab === 'moderation'">
+    <p class="muted">Chaque module applique lui-même les droits ADMIN. Les conversations privées ne sont pas consultables :
+      seuls des compteurs anonymes sont fournis par la messagerie.</p>
+    <div class="moderation-grid">
+      <a routerLink="/app/community" class="card mod-card">
+        <span class="material-icons-round">flag</span>
+        <div><strong>Signalements de la communauté</strong>
+          <span class="muted">{{ metric('reports', 'pending') }} en attente · masquer ou rejeter</span></div>
+      </a>
+      <a routerLink="/app/babysitting" class="card mod-card">
+        <span class="material-icons-round">child_care</span>
+        <div><strong>Demandes de garde</strong>
+          <span class="muted">{{ metric('babysitting', 'requests') }} demande(s) · modifier ou supprimer</span></div>
+      </a>
+      <a routerLink="/app/marketplace" class="card mod-card">
+        <span class="material-icons-round">storefront</span>
+        <div><strong>Annonces du marketplace</strong>
+          <span class="muted">{{ metric('marketplace', 'listings') }} annonce(s) · modifier ou retirer</span></div>
+      </a>
+      <a routerLink="/app/events" class="card mod-card">
+        <span class="material-icons-round">celebration</span>
+        <div><strong>Événements</strong>
+          <span class="muted">{{ metric('events', 'published') }} publié(s) · créer, modifier, annuler</span></div>
+      </a>
+      <a routerLink="/app/neighborhood" class="card mod-card">
+        <span class="material-icons-round">map</span>
+        <div><strong>Quartiers et points de rencontre</strong>
+          <span class="muted">{{ metric('geo', 'neighborhoods') }} quartier(s) · {{ metric('geo', 'meeting_points') }} point(s)</span></div>
+      </a>
+      <div class="card mod-card static">
+        <span class="material-icons-round">lock</span>
+        <div><strong>Messagerie</strong>
+          <span class="muted">{{ metric('messaging', 'conversations') }} conversation(s), {{ metric('messaging', 'messages_last_7_days') }} message(s) sur 7 jours — contenu privé non accessible</span></div>
+      </div>
+    </div>
+  </ng-container>
+</div>

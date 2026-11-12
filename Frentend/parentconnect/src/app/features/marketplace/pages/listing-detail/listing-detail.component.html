@@ -1,0 +1,373 @@
+<div class="listing-detail-page page-container">
+  <!-- Top Navigation & Breadcrumb -->
+  <div class="top-nav-bar">
+    <a routerLink="/app/marketplace" class="btn btn-ghost btn-sm back-link">
+      <span class="material-icons-round icon-sm">arrow_back</span>
+      Retour à la Marketplace
+    </a>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="detail-loading-box card">
+    <div class="skeleton detail-hero-skeleton"></div>
+    <div class="detail-skeleton-text-group">
+      <div class="skeleton skeleton-title"></div>
+      <div class="skeleton skeleton-badge"></div>
+      <div class="skeleton skeleton-body-line"></div>
+      <div class="skeleton skeleton-body-line"></div>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="!isLoading && errorMessage" class="card error-box">
+    <span class="material-icons-round icon-xl">sentiment_dissatisfied</span>
+    <h2>Annonce introuvable</h2>
+    <p>{{ errorMessage }}</p>
+    <a routerLink="/app/marketplace" class="btn btn-primary">
+      Explorer les autres annonces
+    </a>
+  </div>
+
+  <!-- Main Content Layout -->
+  <div *ngIf="!isLoading && listing" class="detail-layout-grid">
+    <!-- Left Column: Gallery & Details -->
+    <div class="left-col">
+      <!-- Media Gallery -->
+      <section class="card media-card">
+        <div class="main-image-wrap">
+          <img
+            [src]="listing.images[selectedImageIndex] || 'https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&q=80'"
+            [alt]="listing.title"
+            class="main-image"
+            (error)="onImageError($event)"
+          />
+
+          <!-- Type and Condition Badges Overlay -->
+          <span class="badge listing-type-badge" [ngClass]="getTypeBadgeClass(listing.type)">
+            {{ getTypeLabel(listing.type) }}
+          </span>
+
+          <span class="badge badge-neutral condition-badge">
+            {{ getConditionLabel(listing.condition) }}
+          </span>
+
+          <!-- Status badge if not available -->
+          <span *ngIf="listing.status === 'BORROWED'" class="badge badge-warning status-badge">
+            <span class="material-icons-round icon-xs">timelapse</span>
+            Actuellement prêté
+          </span>
+          <span *ngIf="listing.status === 'RESERVED'" class="badge badge-warning status-badge">
+            Réservé
+          </span>
+        </div>
+
+        <!-- Thumbnail Strip if multiple images -->
+        <div class="thumbnails-strip" *ngIf="listing.images && listing.images.length > 1">
+          <button
+            *ngFor="let img of listing.images; let idx = index"
+            type="button"
+            class="thumb-btn"
+            [class.active]="selectedImageIndex === idx"
+            (click)="selectImage(idx)"
+          >
+            <img [src]="img" [alt]="listing.title" />
+          </button>
+        </div>
+      </section>
+
+      <!-- Description and Specifications -->
+      <section class="card content-card">
+        <h2 class="section-title-clean">Description de l'article</h2>
+        <div class="description-text">
+          {{ listing.description }}
+        </div>
+
+        <!-- Exchange Details if applicable -->
+        <div *ngIf="listing.type === 'EXCHANGE' && listing.exchangePreferences" class="exchange-highlight-box">
+          <span class="material-icons-round icon-md highlight-icon">swap_horiz</span>
+          <div>
+            <strong>Souhaité en échange :</strong>
+            <p>{{ listing.exchangePreferences }}</p>
+          </div>
+        </div>
+
+        <!-- Target Age & Specifications table -->
+        <div class="specs-grid">
+          <div class="spec-item" *ngIf="listing.targetAgeRange">
+            <span class="material-icons-round icon-sm spec-icon">child_care</span>
+            <div class="spec-info">
+              <span class="spec-label">Âge recommandé</span>
+              <span class="spec-val">{{ listing.targetAgeRange }}</span>
+            </div>
+          </div>
+
+          <div class="spec-item">
+            <span class="material-icons-round icon-sm spec-icon">category</span>
+            <div class="spec-info">
+              <span class="spec-label">Catégorie</span>
+              <span class="spec-val">{{ listing.category }}</span>
+            </div>
+          </div>
+
+          <div class="spec-item">
+            <span class="material-icons-round icon-sm spec-icon">check_circle</span>
+            <div class="spec-info">
+              <span class="spec-label">État certifié</span>
+              <span class="spec-val">{{ getConditionLabel(listing.condition) }}</span>
+            </div>
+          </div>
+
+          <div class="spec-item">
+            <span class="material-icons-round icon-sm spec-icon">calendar_today</span>
+            <div class="spec-info">
+              <span class="spec-label">Date de publication</span>
+              <span class="spec-val">{{ listing.createdAt | date:'d MMMM y' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags List -->
+        <div class="tags-section" *ngIf="listing.tags && listing.tags.length > 0">
+          <h3 class="subsection-title">Mots-clés</h3>
+          <div class="tags-row">
+            <span *ngFor="let tag of listing.tags" class="tag-badge">
+              #{{ tag }}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Neighborhood Map Preview Placeholder -->
+      <section class="card location-card">
+        <h2 class="section-title-clean">
+          <span class="material-icons-round icon-sm">place</span>
+          Localisation & Retrait
+        </h2>
+        <p class="location-desc">
+          Article disponible à <strong>{{ listing.location.neighborhood ? listing.location.neighborhood + ', ' : '' }}{{ listing.location.city || 'Paris' }} ({{ listing.location.postalCode || '75011' }})</strong>.
+        </p>
+
+        <div class="map-preview-placeholder">
+          <div class="map-radial-pin">
+            <span class="material-icons-round map-pin-icon">location_on</span>
+          </div>
+          <span class="map-label">Zone de remise en main propre sécurisée</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Column: Sticky Summary & Actions -->
+    <div class="right-col">
+      <div class="sticky-side-card card">
+        <!-- Top Price / Type banner -->
+        <div class="price-header">
+          <div class="price-amount" [ngClass]="getTypeBadgeClass(listing.type)">
+            {{ getPriceDisplay() }}
+          </div>
+          <span class="badge" [ngClass]="getTypeBadgeClass(listing.type)">
+            {{ getTypeLabel(listing.type) }}
+          </span>
+        </div>
+
+        <h1 class="item-title">{{ listing.title }}</h1>
+
+        <div class="quick-meta">
+          <span class="material-icons-round icon-sm">place</span>
+          <span>{{ listing.location.neighborhood || listing.location.city || 'Paris' }}</span>
+          <span class="bullet-dot">•</span>
+          <span>{{ listing.createdAt | date:'shortDate' }}</span>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- Owner Profile Card -->
+        <div class="owner-card">
+          <div class="avatar avatar-md owner-avatar">
+            <img *ngIf="listing.ownerAvatar" [src]="listing.ownerAvatar" [alt]="listing.ownerName" />
+            <span *ngIf="!listing.ownerAvatar">{{ getInitials(listing.ownerName) }}</span>
+          </div>
+          <div class="owner-meta">
+            <span class="owner-name">{{ listing.ownerName }}</span>
+            <span class="owner-response">
+              <span class="material-icons-round icon-xs">bolt</span>
+              Répond généralement en moins de 2h
+            </span>
+            <span class="owner-location text-muted text-xs">Parent vérifié • {{ listing.location.city || 'Paris' }}</span>
+          </div>
+        </div>
+
+        <!-- Action CTAs -->
+        <div class="action-buttons-stack">
+          <!-- Borrow button if LENDING -->
+          <button
+            *ngIf="listing.type === 'LENDING' && listing.status === 'AVAILABLE'"
+            type="button"
+            class="btn btn-primary btn-lg action-btn borrow-cta"
+            (click)="openBorrowModal()"
+          >
+            <span class="material-icons-round icon-md">calendar_month</span>
+            Emprunter ce matériel
+          </button>
+
+          <!-- Contact Button -->
+          <a
+            routerLink="/app/messages"
+            [queryParams]="{ recipient: listing.ownerId, listing: listing.id, title: listing.title }"
+            class="btn btn-primary btn-lg action-btn"
+          >
+            <span class="material-icons-round icon-md">chat_bubble_outline</span>
+            Contacter le parent
+          </a>
+
+          <!-- Favorite toggle -->
+          <button
+            type="button"
+            class="btn btn-secondary action-btn"
+            [class.is-fav]="listing.isFavorited"
+            (click)="toggleFavorite()"
+          >
+            <span class="material-icons-round icon-md" [class.fav-heart]="listing.isFavorited">
+              {{ listing.isFavorited ? 'favorite' : 'favorite_border' }}
+            </span>
+            <span>{{ listing.isFavorited ? 'Dans vos favoris' : 'Ajouter aux favoris' }}</span>
+          </button>
+
+          <!-- Report Button -->
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm report-btn"
+            (click)="openReportModal()"
+          >
+            <span class="material-icons-round icon-sm">flag</span>
+            Signaler cette annonce
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Emprunter ce matériel (LENDING) -->
+  <div class="modal-backdrop" *ngIf="showBorrowModal" (click)="closeBorrowModal()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="material-icons-round modal-icon">handshake</span>
+          <div>
+            <h3>Demande d'emprunt solidaire</h3>
+            <p class="modal-subtitle">{{ listing?.title }}</p>
+          </div>
+        </div>
+        <button type="button" class="close-modal-btn" (click)="closeBorrowModal()">
+          <span class="material-icons-round icon-sm">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="borrow-explanation">
+          Le prêt entre parents repose sur la confiance et l'entraide de quartier. Convenez de dates prévisionnelles de retrait et de retour.
+        </p>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="borrowStartDate">Date de début</label>
+            <input
+              id="borrowStartDate"
+              type="date"
+              class="form-control"
+              [(ngModel)]="borrowStartDate"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="borrowReturnDate">Date de retour estimée *</label>
+            <input
+              id="borrowReturnDate"
+              type="date"
+              class="form-control"
+              [(ngModel)]="borrowReturnDate"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="borrowNotes">Message pour {{ listing?.ownerName }}</label>
+          <textarea
+            id="borrowNotes"
+            class="form-control"
+            rows="3"
+            [(ngModel)]="borrowNotes"
+            placeholder="Bonjour, je serais très intéressé(e) pour vous emprunter ce matériel durant ce week-end..."
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeBorrowModal()">
+          Annuler
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="isSubmittingBorrow || !borrowReturnDate"
+          (click)="submitBorrow()"
+        >
+          <span class="material-icons-round icon-sm" *ngIf="!isSubmittingBorrow">check</span>
+          <span class="material-icons-round icon-sm spin-loader" *ngIf="isSubmittingBorrow">sync</span>
+          <span>{{ isSubmittingBorrow ? 'Envoi...' : 'Confirmer la demande' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Signaler l'annonce -->
+  <div class="modal-backdrop" *ngIf="showReportModal" (click)="closeReportModal()">
+    <div class="modal-card card" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="material-icons-round modal-icon flag-icon">flag</span>
+          <div>
+            <h3>Signaler cette annonce</h3>
+            <p class="modal-subtitle">Aidez-nous à préserver la sécurité de la communauté</p>
+          </div>
+        </div>
+        <button type="button" class="close-modal-btn" (click)="closeReportModal()">
+          <span class="material-icons-round icon-sm">close</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="reportReasonSelect">Motif du signalement</label>
+          <select id="reportReasonSelect" class="form-control" [(ngModel)]="reportReason">
+            <option value="INAPPROPRIATE">Contenu inapproprié ou illicite</option>
+            <option value="SPAM">Spam, arnaque ou faux profil</option>
+            <option value="DEFECTIVE">Matériel endommagé ou dangereux</option>
+            <option value="WRONG_CATEGORY">Mauvaise catégorie</option>
+            <option value="OTHER">Autre motif</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="reportDetailsInput">Précisions utiles (optionnel)</label>
+          <textarea
+            id="reportDetailsInput"
+            class="form-control"
+            rows="3"
+            [(ngModel)]="reportDetails"
+            placeholder="Détaillez le problème rencontré..."
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeReportModal()">
+          Annuler
+        </button>
+        <button type="button" class="btn btn-danger" (click)="submitReport()">
+          Envoyer le signalement
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  post-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: parentconnect/post-service:latest
+    container_name: parentconnect-post-service
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8001}:8080"
+    environment:
+      APP_NAME: "Post Service"
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost:8001}
+      APP_PORT: 8080
+      PORT: 8080
+      DB_CONNECTION: pgsql
+      DB_HOST: ${DB_HOST:-post-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-post_db}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-1234}
+      AUTO_MIGRATE: "true"
+      AUTO_SEED: "false"
+      L5_SWAGGER_GENERATE_ALWAYS: "true"
+      # Eureka Service Discovery
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      EUREKA_APP_NAME: ${EUREKA_APP_NAME:-parentconnect-post}
+      EUREKA_INSTANCE_HOST: ${EUREKA_INSTANCE_HOST:-parentconnect-post-service}
+      EUREKA_PORT: 8080
+      # Keycloak JWT Security
+      KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtZSLiienoTTcqkodQZdR6kwofXkQx47shJ4tSkoA1Q7RLTXXAcS/rr0Xmiyhv0UZlXdjQFB2NZu978UIIL7hRSZCXz/SOCHVRPHuFXB1qV3IAJrEUc+hye7+24/VUdVm0BQTkFoiSkBHuaq7zhEszT1wWL602BrNUnyUzIYo/uYOpd54/OnMtgyrPHnWczB3OA3VC8hLEW4kDdik5vIxr7B+xytTD+cmo/zhHv2F9W0fjperQWANK33jFRtd+BHpQgZNuiWfh8JqaWvZGTs7RvVj6drJZRHTgSQuoyqJ51Mxr3wTUWKHLl5BqtYb0YJvYr20wR6byXOUIRfAzeNrOwIDAQAB}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-parentconnect}
+      KEYCLOAK_AUTH_SERVER_URL: ${KEYCLOAK_AUTH_SERVER_URL:-http://keycloak:8180}
+      JWT_SECRET: ${JWT_SECRET:-super_secret_parentconnect_jwt_key_2026_community}
+      # RabbitMQ Message Broker
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE:-post_events_queue}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - parentconnect-network
+
+networks:
+  parentconnect-network:
+    external: true
+
