@@ -1,0 +1,52 @@
+# =====================================================================
+# Exemple de routes pour l'API Gateway ParentConnect (Spring Cloud Gateway).
+# À intégrer dans le projet API Gateway (hors périmètre de ce dépôt).
+#
+# Les routes de Participation Service partagent le préfixe /api/events avec Event Service :
+# elles doivent donc être déclarées AVANT la route générique /api/events/** (ordre explicite).
+# Les chemins /internal/** ne doivent JAMAIS être exposés par la Gateway.
+#
+# "lb://<nom>" : l'adresse est résolue via Eureka (http://eureka-server:8761/eureka/).
+# La Gateway doit donc être cliente Eureka (spring-cloud-starter-netflix-eureka-client).
+# Noms d'enregistrement Eureka : PARENTCONNECT-EVENT-SERVICE et PARENTCONNECT-PARTICIPATION-SERVICE.
+# Sans Eureka, remplacer par http://event-service:8080 et http://participation-service:8080 (port interne).
+#
+# Authentification : la Gateway peut transmettre le JWT Keycloak tel quel (les services le vérifient en RS256),
+# ou ajouter X-Gateway-Auth: verified, X-User-Id: <sub Keycloak>, X-User-Role: <rôle> (mode relais).
+# =====================================================================
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        # --- Participation Service (routes spécifiques, priorité haute) ---
+        - id: participation-join-leave-participants
+          uri: lb://PARENTCONNECT-PARTICIPATION-SERVICE
+          order: 0
+          predicates:
+            - Path=/api/events/{id}/join,/api/events/{id}/leave,/api/events/{id}/participants
+        - id: participation-me-joined
+          uri: lb://PARENTCONNECT-PARTICIPATION-SERVICE
+          order: 0
+          predicates:
+            - Path=/api/events/me/joined
+
+        # --- Event Service (route générique, priorité plus basse) ---
+        - id: event-service
+          uri: lb://PARENTCONNECT-EVENT-SERVICE
+          order: 10
+          predicates:
+            - Path=/api/events,/api/events/**
+
+        # --- Blocage explicite des endpoints interservices ---
+        - id: block-internal
+          uri: no://op
+          order: -1
+          predicates:
+            - Path=/internal/**
+          filters:
+            - SetStatus=404

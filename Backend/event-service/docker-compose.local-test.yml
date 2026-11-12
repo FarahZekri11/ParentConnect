@@ -1,0 +1,72 @@
+# =====================================================================
+# Event Service — TEST LOCAL ISOLÉ
+#
+# Mon service + sa base PostgreSQL dédiée, sur un réseau bridge local.
+# Aucune dépendance externe : pas de Gateway, Keycloak, Eureka ni RabbitMQ.
+# Profil "dev" : événements de démonstration + JWT de test via GET /dev/tokens.
+#
+# Lancement : docker compose -f docker-compose.local-test.yml up -d --build
+# Swagger   : http://localhost:8085/swagger-ui/index.html
+# Santé     : http://localhost:8085/api/health
+# Arrêt     : docker compose -f docker-compose.local-test.yml down   (ajouter -v pour effacer la base)
+# =====================================================================
+name: event-service-local-test
+
+services:
+
+  event-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: events_db
+      POSTGRES_USER: events_user
+      POSTGRES_PASSWORD: ${EVENT_DB_PASSWORD:-local-test-password}
+      TZ: Europe/Paris
+      PGTZ: Europe/Paris
+    ports:
+      - "${EVENT_DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - event-postgres-local-test-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events_user -d events_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - local-test
+
+  event-service:
+    build:
+      context: .
+    image: parentconnect-event:1.0
+    depends_on:
+      event-postgres:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      SPRING_PROFILES_ACTIVE: dev
+      DB_HOST: event-postgres
+      DB_PORT: 5432
+      DB_NAME: events_db
+      DB_USERNAME: events_user
+      DB_PASSWORD: ${EVENT_DB_PASSWORD:-local-test-password}
+      # Tokens de démonstration (GET /dev/tokens).
+      # Renseigner KEYCLOAK_REALM_PUBLIC_KEY pour accepter aussi de vrais tokens Keycloak.
+      JWT_SECRET: ${JWT_SECRET:-local-test-secret-change-me-0123456789abcdef}
+      KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:-}
+      # Doit être identique à celle de Participation Service pour qu'il puisse appeler ce service
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-local-test-internal-key}
+      # Pas d'Eureka ni de RabbitMQ en test isolé (les notifications sont journalisées)
+      EUREKA_ENABLED: "false"
+      RABBITMQ_ENABLED: "false"
+      TZ: Europe/Paris
+    ports:
+      - "${EVENT_SERVICE_HOST_PORT:-8085}:8080"
+    networks:
+      - local-test
+
+networks:
+  local-test:
+    driver: bridge
+
+volumes:
+  event-postgres-local-test-data:

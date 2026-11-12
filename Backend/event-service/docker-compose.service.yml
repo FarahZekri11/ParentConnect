@@ -1,0 +1,80 @@
+# =====================================================================
+# Event Service — composition d'INTÉGRATION ParentConnect
+#
+# Contient uniquement mon service et sa base de données dédiée.
+# Ne crée PAS l'API Gateway, Keycloak, Eureka ni RabbitMQ : ce sont les serveurs partagés
+# de l'intégrateur, joignables sur le réseau externe "parentconnect-network".
+#
+# Prérequis : réseau partagé existant (docker network create parentconnect-network)
+#             et fichier .env à côté de ce fichier (copier .env.example)
+# Lancement : docker compose -f docker-compose.service.yml up -d --build
+# =====================================================================
+name: parentconnect-event-service
+
+services:
+
+  event-postgres:
+    image: postgres:16-alpine
+    container_name: event-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: events_db
+      POSTGRES_USER: ${EVENT_DB_USER:-events_user}
+      POSTGRES_PASSWORD: ${EVENT_DB_PASSWORD:?EVENT_DB_PASSWORD doit être défini dans .env}
+      TZ: ${TZ:-Europe/Paris}
+      PGTZ: ${TZ:-Europe/Paris}
+    volumes:
+      - event-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - parentconnect-network
+
+  event-service:
+    build:
+      context: .
+    image: parentconnect-event:1.0
+    # Nom DNS sur le réseau partagé : http://event-service:8080 (utilisé par Participation Service)
+    container_name: event-service
+    restart: unless-stopped
+    depends_on:
+      event-postgres:
+        condition: service_healthy
+    environment:
+      # Écoute 0.0.0.0:8080 (port interne standard ; aucun port publié : accès via l'API Gateway)
+      PORT: 8080
+      SPRING_PROFILES_ACTIVE: ""
+      # Base de données dédiée
+      DB_HOST: event-postgres
+      DB_PORT: 5432
+      DB_NAME: events_db
+      DB_USERNAME: ${EVENT_DB_USER:-events_user}
+      DB_PASSWORD: ${EVENT_DB_PASSWORD}
+      # Keycloak (realm parentconnect, RS256)
+      KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:?KEYCLOAK_REALM_PUBLIC_KEY doit être défini dans .env}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-}
+      GATEWAY_RELAY_ENABLED: ${GATEWAY_RELAY_ENABLED:-true}
+      # Eureka partagé
+      EUREKA_SERVER_URL: ${EUREKA_SERVER_URL:-http://eureka-server:8761/eureka/}
+      # RabbitMQ partagé (exchange parentconnect.topic)
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-true}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # Clé des appels Participation Service -> Event Service (/internal/**), identique des deux côtés
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY doit être défini dans .env}
+      TZ: ${TZ:-Europe/Paris}
+    networks:
+      - parentconnect-network
+
+networks:
+  parentconnect-network:
+    external: true
+
+volumes:
+  event-postgres-data:
+    name: parentconnect-event-postgres-data

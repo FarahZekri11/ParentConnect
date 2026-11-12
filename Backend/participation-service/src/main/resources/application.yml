@@ -1,0 +1,138 @@
+# =====================================================================
+# Participation Service - configuration par défaut (production-ready)
+# Tous les secrets proviennent des variables d'environnement.
+# =====================================================================
+server:
+  # Port interne standardisé ParentConnect : 8080 (paramétrable par PORT ou APP_PORT), écoute sur toutes les interfaces
+  port: ${PORT:${APP_PORT:8080}}
+  address: ${SERVER_ADDRESS:0.0.0.0}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  application:
+    # Nom d'enregistrement Eureka : PARENTCONNECT-PARTICIPATION-SERVICE
+    name: parentconnect-participation-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:participations_db}
+    username: ${DB_USERNAME:participations_user}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # le schéma est géré exclusivement par Flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Le seed de démo (profil dev) peut avoir été appliqué : on l'ignore s'il est absent du classpath courant
+    ignore-migration-patterns: "*:missing"
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+        default-page-size: 20
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+security:
+  jwt:
+    # Keycloak (realm parentconnect) : JWT RS256 vérifiés avec la clé publique RSA du realm
+    keycloak-public-key: ${KEYCLOAK_REALM_PUBLIC_KEY:}
+    # Émetteur attendu (facultatif), ex. http://keycloak:8080/realms/parentconnect
+    issuer: ${KEYCLOAK_ISSUER:}
+    user-id-claim: ${JWT_USER_ID_CLAIM:sub}
+    roles-claim-path: ${JWT_ROLES_CLAIM_PATH:realm_access.roles}
+    clock-skew-seconds: 30
+    # Tokens HS256 de démonstration : uniquement en profil dev
+    dev-tokens-enabled: false
+    dev-secret: ${JWT_SECRET:}
+  # Mode relais API Gateway : X-Gateway-Auth: verified + X-User-Id / X-User-Role
+  gateway-relay:
+    enabled: ${GATEWAY_RELAY_ENABLED:true}
+
+clients:
+  event-service:
+    # URL interne d'Event Service (nom du conteneur sur le réseau Docker, jamais localhost entre conteneurs)
+    base-url: ${EVENT_SERVICE_URL:http://event-service:8080}
+    api-key: ${INTERNAL_API_KEY:}
+    connect-timeout: ${EVENT_SERVICE_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${EVENT_SERVICE_READ_TIMEOUT:PT5S}
+    max-attempts: ${EVENT_SERVICE_MAX_ATTEMPTS:3}
+    initial-backoff: ${EVENT_SERVICE_INITIAL_BACKOFF:PT0.2S}
+
+app:
+  public-url: ${PARTICIPATION_SERVICE_PUBLIC_URL:http://localhost:8086}
+  messaging:
+    rabbitmq:
+      # RABBITMQ_ENABLED=true : publication sur RabbitMQ ; sinon les notifications sont journalisées
+      enabled: ${RABBITMQ_ENABLED:false}
+    exchange: ${RABBITMQ_EXCHANGE:parentconnect.topic}
+    queue: participation_events_queue
+  reconciliation:
+    enabled: ${RECONCILIATION_ENABLED:true}
+    interval: ${RECONCILIATION_INTERVAL:PT5M}
+    initial-delay: PT1M
+    grace-seconds: ${RECONCILIATION_GRACE_SECONDS:120}
+    batch-size: 200
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    rabbit:
+      enabled: false              # une indisponibilité de RabbitMQ ne rend pas le service indisponible
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ParentConnect Participation Service
+    version: 1.0.0
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    persist-authorization: true
+    display-request-duration: true
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    root: INFO
+    com.parentconnect: INFO
+
+# Service discovery : inscription auprès du serveur Eureka partagé (géré par l'intégrateur).
+# Si Eureka est indisponible, le service fonctionne normalement et réessaie de s'inscrire.
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:true}
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:${EUREKA_URL:http://eureka-server:8761/eureka/}}
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30

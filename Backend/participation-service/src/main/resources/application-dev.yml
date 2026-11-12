@@ -1,0 +1,35 @@
+# =====================================================================
+# Profil "dev" : RÉSERVÉ AU DÉVELOPPEMENT LOCAL.
+# - Active l'endpoint GET /dev/tokens qui génère des JWT de démonstration (format Keycloak, HS256)
+# - Ports et URLs adaptés à un lancement depuis l'IDE (dans Docker, PORT=8080 est imposé par l'image)
+# La sécurité reste active : les tokens de démo sont validés comme les vrais.
+# =====================================================================
+spring:
+  datasource:
+    password: ${DB_PASSWORD:participations_password}
+
+security:
+  jwt:
+    # Tokens HS256 de démonstration (GET /dev/tokens) acceptés en plus des tokens Keycloak RS256.
+    dev-tokens-enabled: true
+    # Valeur de repli pour un lancement depuis l'IDE uniquement. Ne JAMAIS utiliser en production.
+    dev-secret: ${JWT_SECRET:dev-only-insecure-secret-change-me-0123456789}
+
+clients:
+  event-service:
+    # Lancement depuis l'IDE : Event Service lancé localement sur 8085
+    base-url: ${EVENT_SERVICE_URL:http://localhost:8085}
+    api-key: ${INTERNAL_API_KEY:dev-only-internal-api-key}
+
+logging:
+  level:
+    com.parentconnect: DEBUG
+
+# Lancement depuis l'IDE : ports historiques (dans Docker l'image impose PORT=8080) et Eureka local
+server:
+  port: ${PORT:${APP_PORT:8086}}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:${EUREKA_URL:http://localhost:8761/eureka/}}

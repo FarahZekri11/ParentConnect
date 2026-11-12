@@ -1,0 +1,29 @@
+# Sorties de build et dépendances locales
+target/
+.mvn/wrapper/maven-wrapper.jar
+*.class
+*.log
+
+# Variables d'environnement et secrets
+.env
+.env.*
+*.pem
+*.key
+
+# IDE / OS / VCS
+.idea/
+.vscode/
+*.iml
+.project
+.classpath
+.settings/
+.DS_Store
+Thumbs.db
+.git
+.gitignore
+
+# Documentation (inutile dans l'image)
+README.md
+
+# Fichiers Docker Compose (non nécessaires dans l image)
+docker-compose*.yml

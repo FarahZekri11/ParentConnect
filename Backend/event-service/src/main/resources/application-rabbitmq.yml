@@ -1,0 +1,6 @@
+# Profil "rabbitmq" (équivalent à RABBITMQ_ENABLED=true) : publication des notifications
+# sur l'exchange partagé parentconnect.topic.
+app:
+  messaging:
+    rabbitmq:
+      enabled: true

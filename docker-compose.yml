@@ -1,0 +1,197 @@
+# =====================================================================
+# ParentConnect - Event Service & Participation Service
+# ENVIRONNEMENT DE DÉVELOPPEMENT LOCAL (n'est pas la composition finale du groupe).
+# Lancement (Eureka local + 2 microservices + 2 bases PostgreSQL) :
+#     docker compose up -d --build
+# Prérequis : copier .env.example en .env (cp .env.example .env)
+#
+# Intégration : seuls Backend/event-service et Backend/participation-service sont livrés.
+# L'API Gateway, Keycloak, Eureka et RabbitMQ partagés sont fournis par l'intégrateur
+# (Eureka et RabbitMQ ne sont lancés ici que pour tester en local) — voir INTEGRATION.md.
+# Dans les conteneurs, chaque service écoute sur le port interne standard 8080.
+# =====================================================================
+name: parentconnect
+
+services:
+
+  # ---------------------- Annuaire des services ----------------------
+  eureka-server:
+    build:
+      context: ./local-dev/eureka-server
+    image: parentconnect-eureka:1.0
+    container_name: parentconnect-eureka
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8761
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${EUREKA_HOST_PORT:-8761}:8761"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - parentconnect-network
+
+  # ------------------------- Bases de données -------------------------
+  event-postgres:
+    image: postgres:16-alpine
+    container_name: parentconnect-event-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: events_db
+      POSTGRES_USER: ${EVENT_DB_USER:-events_user}
+      POSTGRES_PASSWORD: ${EVENT_DB_PASSWORD:?EVENT_DB_PASSWORD doit être défini dans .env}
+      TZ: ${TZ:-Europe/Paris}
+      PGTZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${EVENT_DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - event-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - parentconnect-network
+
+  participation-postgres:
+    image: postgres:16-alpine
+    container_name: parentconnect-participation-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: participations_db
+      POSTGRES_USER: ${PARTICIPATION_DB_USER:-participations_user}
+      POSTGRES_PASSWORD: ${PARTICIPATION_DB_PASSWORD:?PARTICIPATION_DB_PASSWORD doit être défini dans .env}
+      TZ: ${TZ:-Europe/Paris}
+      PGTZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${PARTICIPATION_DB_HOST_PORT:-5434}:5432"
+    volumes:
+      - participation-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - parentconnect-network
+
+  # --------------------------- Microservices --------------------------
+  event-service:
+    build:
+      context: ./Backend/event-service
+    image: parentconnect-event:1.0
+    container_name: parentconnect-event-service
+    restart: unless-stopped
+    depends_on:
+      event-postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      DB_HOST: event-postgres
+      DB_PORT: 5432
+      DB_NAME: events_db
+      DB_USERNAME: ${EVENT_DB_USER:-events_user}
+      DB_PASSWORD: ${EVENT_DB_PASSWORD}
+      # Keycloak (RS256) : clé publique du realm parentconnect (vide = tokens de démo du profil dev uniquement)
+      KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:-}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-}
+      # Secret des tokens de démonstration HS256 (profil dev uniquement)
+      JWT_SECRET: ${JWT_SECRET:-}
+      GATEWAY_RELAY_ENABLED: ${GATEWAY_RELAY_ENABLED:-true}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY doit être défini dans .env}
+      EVENT_SERVICE_PUBLIC_URL: ${EVENT_SERVICE_PUBLIC_URL:-http://localhost:8085}
+      # Inscription dans l'annuaire (nom Docker, jamais localhost)
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-false}
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${EVENT_SERVICE_HOST_PORT:-8085}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - parentconnect-network
+
+  participation-service:
+    build:
+      context: ./Backend/participation-service
+    image: parentconnect-participation:1.0
+    container_name: parentconnect-participation-service
+    restart: unless-stopped
+    depends_on:
+      participation-postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+      DB_HOST: participation-postgres
+      DB_PORT: 5432
+      DB_NAME: participations_db
+      DB_USERNAME: ${PARTICIPATION_DB_USER:-participations_user}
+      DB_PASSWORD: ${PARTICIPATION_DB_PASSWORD}
+      # Keycloak (RS256) : clé publique du realm parentconnect (vide = tokens de démo du profil dev uniquement)
+      KEYCLOAK_REALM_PUBLIC_KEY: ${KEYCLOAK_REALM_PUBLIC_KEY:-}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-}
+      # Secret des tokens de démonstration HS256 (profil dev uniquement)
+      JWT_SECRET: ${JWT_SECRET:-}
+      GATEWAY_RELAY_ENABLED: ${GATEWAY_RELAY_ENABLED:-true}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      # Communication interservices par le nom Docker (jamais localhost)
+      EVENT_SERVICE_URL: http://event-service:8080
+      PARTICIPATION_SERVICE_PUBLIC_URL: ${PARTICIPATION_SERVICE_PUBLIC_URL:-http://localhost:8086}
+      # Inscription dans l'annuaire (nom Docker, jamais localhost)
+      EUREKA_SERVER_URL: http://eureka-server:8761/eureka/
+      RECONCILIATION_INTERVAL: ${RECONCILIATION_INTERVAL:-PT5M}
+      RECONCILIATION_GRACE_SECONDS: ${RECONCILIATION_GRACE_SECONDS:-120}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-false}
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - "${PARTICIPATION_SERVICE_HOST_PORT:-8086}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - parentconnect-network
+
+  # ---------------- RabbitMQ local (FACULTATIF, non démarré par défaut) ----------------
+  # Démarrage : RABBITMQ_ENABLED=true dans .env, puis docker compose --profile rabbitmq up -d --build
+  # Interface : http://localhost:15672 (guest / guest) — exchange parentconnect.topic
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: parentconnect-rabbitmq
+    profiles: ["rabbitmq"]
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - parentconnect-network
+
+networks:
+  parentconnect-network:
+    name: parentconnect-network
+    driver: bridge
+
+volumes:
+  event-postgres-data:
+    name: parentconnect-event-postgres-data
+  participation-postgres-data:
+    name: parentconnect-participation-postgres-data
